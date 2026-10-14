@@ -1,56 +1,65 @@
-# Welcome to your Expo app 👋
+# Roami
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Plans, minus the admin. Throw out a Roam, see who bites.
 
-## Get started
+An iOS + Android app (no web) built with Expo SDK 57, Expo Router and Supabase.
 
-1. Install dependencies
+## One-time setup
 
-   ```bash
-   npm install
-   ```
+### 1. Create the database
+In the [Supabase dashboard](https://supabase.com/dashboard/project/iounsooetwcgfruvnylj) open **SQL Editor → New query**, paste the whole of
+`supabase/migrations/20261014200000_initial_schema.sql`, and press **Run**.
 
-2. Start the app
+This creates the tables, the privacy rules (row level security), the functions the app calls, live updates, and the `avatars` photo bucket.
 
-   ```bash
-   npx expo start
-   ```
+### 2. Turn on phone login with Twilio
+In the Supabase dashboard go to **Authentication → Sign In / Providers → Phone**:
 
-In the output, you'll find options to open the app in a
+1. Enable the Phone provider.
+2. SMS provider: **Twilio**.
+3. Paste your Twilio **Account SID**, **Auth Token**, and the **Message Service SID** (or Twilio phone number) that sends the texts.
+4. Save.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+The Twilio token lives only in Supabase. It must never go in this repo or the app.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+### 3. Run it on your phone
 ```bash
-npm run reset-project
+npm install
+npx expo start
+```
+Scan the QR code with the **Expo Go** app (iOS) or the camera.
+
+Push notifications and some native features need a **development build** instead of Expo Go, especially on Android:
+```bash
+npx eas-cli@latest build --profile development --platform ios     # or android
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## What's in here
 
-### Other setup steps
+| Path | What it is |
+| --- | --- |
+| `src/app/(auth)` | Welcome + phone number / SMS code login |
+| `src/app/(onboarding)/setup.tsx` | Display name + profile photo |
+| `src/app/(app)/index.tsx` | The feed: waiting on you, up for grabs, your Roams |
+| `src/app/(app)/send.tsx` | Send a Roam: crews, what, vibe, when, where, spots |
+| `src/app/(app)/roam/[id].tsx` | One Roam: respond, double-booked check, bring someone, can't make it, take the wheel |
+| `src/app/(app)/friends.tsx` | Find friends from contacts, requests, invite link |
+| `src/app/(app)/crews` | Private crews with "last roamed" |
+| `src/lib` | Supabase client, auth, data hooks, Roam rules |
+| `supabase/migrations` | The database schema |
+| `supabase/tests` | Tests for the schema's rules (`npm run test:db`) |
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Rules the app follows (from the spec)
 
-## Learn more
+- Crews are private to their owner. Invitees see who's **In**, never who said Maybe or Can't (only the host sees those).
+- A Maybe turns into a Can't an hour before the start.
+- If the host can't make it and others are In, the Roam goes **up for grabs** and anyone who's In can take it over. If nobody's In, it's called off.
+- Saying In to something that overlaps a Roam you're already In on asks which one to skip.
+- Max 5 active Roams per host, up to 7 days ahead, optional 1–20 spots.
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Checks
+```bash
+npm run typecheck
+npx expo lint
+npm run test:db
+```
