@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, Pressable, Share, Text, TextInput, View } from 'react-native';
 
 import { ShareIcon } from '@/components/icons';
+import { TestTools } from '@/components/test-tools';
 import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { SKIP_LOGIN } from '@/lib/config';
@@ -121,6 +122,10 @@ export default function Friends() {
       <TopBar onBack={onboarding ? undefined : () => router.back()} />
       <H1 style={{ marginTop: 20, marginBottom: 8 }}>Find your people</H1>
       <Body style={{ marginBottom: 20 }}>Friends have to add each other back. Mutual vibes only.</Body>
+
+      <View style={{ marginBottom: 20 }}>
+        <TestTools onChange={reload} />
+      </View>
 
       <Sticker color={colors.lime} innerStyle={{ padding: 16, gap: 12 }} style={{ marginBottom: 24 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

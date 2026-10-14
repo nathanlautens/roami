@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddPersonIcon, CrewsIcon, PeopleIcon, PlusIcon } from '@/components/icons';
 import { RoamCard } from '@/components/roam-card';
+import { TestTools } from '@/components/test-tools';
 import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
@@ -18,7 +19,7 @@ export default function Feed() {
   const { profile, userId } = useAuth();
   const me = userId!;
   const { data: items, loading, reload } = useFeed();
-  const { data: friends } = useFriends();
+  const { data: friends, reload: reloadFriends } = useFriends();
 
   const sections = useMemo(() => {
     const byStart = (a: FeedItem, b: FeedItem) => a.roam.starts_at.localeCompare(b.roam.starts_at);
@@ -75,6 +76,10 @@ export default function Feed() {
             <Body style={{ color: colors.ink }}>Add your friends, make a crew, then throw out your first Roam.</Body>
             <Button label="Find your people" onPress={() => router.push('/friends?onboarding=1')} />
           </Sticker>
+        ) : null}
+
+        {noFriends && !loading ? (
+          <TestTools onChange={() => { reload(); reloadFriends(); }} />
         ) : null}
 
         {friends.incoming.length ? (
