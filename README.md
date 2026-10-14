@@ -12,15 +12,16 @@ In the [Supabase dashboard](https://supabase.com/dashboard/project/iounsooetwcgf
 
 This creates the tables, the privacy rules (row level security), the functions the app calls, live updates, and the `avatars` photo bucket.
 
-### 2. Turn on phone login with Twilio
-In the Supabase dashboard go to **Authentication → Sign In / Providers → Phone**:
+### 2. Turn on phone login (free, no SMS provider)
+While testing, login codes aren't texted. They're saved to a table you can read in the dashboard.
 
-1. Enable the Phone provider.
-2. SMS provider: **Twilio**.
-3. Paste your Twilio **Account SID**, **Auth Token**, and the **Message Service SID** (or Twilio phone number) that sends the texts.
-4. Save.
+1. **SQL Editor → New query**: paste the whole of `supabase/migrations/20261014210000_dev_sms_hook.sql` and **Run**.
+2. **Authentication → Sign In / Providers → Phone**: switch it on, with phone signups allowed.
+3. **Authentication → Hooks → Send SMS hook**: choose **Postgres**, schema `public`, function `send_sms_hook`, and enable it.
+4. In the app, enter a phone number. Then open **Table Editor → dev_sms_codes** to find the 6-digit code. Codes also appear in **Logs → Postgres**.
 
-The Twilio token lives only in Supabase. It must never go in this repo or the app.
+Friends testing the app can't see the table, so you'll need to send them their code.
+Before real users: disable the hook and connect a real SMS provider (e.g. Twilio Verify) under the Phone provider settings.
 
 ### 3. Run it on your phone
 ```bash
@@ -62,4 +63,5 @@ npx eas-cli@latest build --profile development --platform ios     # or android
 npm run typecheck
 npx expo lint
 npm run test:db
+npm run test:sms-hook
 ```

@@ -50,7 +50,8 @@
     "ios": "expo start --ios",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test:db": "node supabase/tests/schema.test.mjs supabase/migrations/20261014200000_initial_schema.sql"
+    "test:db": "node supabase/tests/schema.test.mjs supabase/migrations/20261014200000_initial_schema.sql",
+    "test:sms-hook": "node supabase/tests/sms-hook.test.mjs supabase/migrations/20261014210000_dev_sms_hook.sql"
   },
   "private": true
 }
