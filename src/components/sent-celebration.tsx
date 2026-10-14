@@ -33,10 +33,10 @@ export function SentCelebration() {
   const sent = useCelebration();
   if (!sent) return null;
   // A fresh key per send replays the animation.
-  return <Burst key={sent.id} what={sent.what} count={sent.count} />;
+  return <Burst key={sent.id} what={sent.what} count={sent.count} title={sent.title} line={sent.line} />;
 }
 
-function Burst({ what, count }: { what: string; count: number }) {
+function Burst({ what, count, title = 'Roam sent!', line }: { what: string; count: number; title?: string; line?: string }) {
   const { width } = useWindowDimensions();
   const [pieces] = useState(() => makePieces(width));
   const [pop] = useState(() => new Animated.Value(0));
@@ -69,7 +69,7 @@ function Burst({ what, count }: { what: string; count: number }) {
         <Pressable
           onPress={close}
           accessibilityRole="button"
-          accessibilityLabel="Roam sent. Tap to close."
+          accessibilityLabel={`${title} Tap to close.`}
           style={{ flex: 1, backgroundColor: 'rgba(23, 18, 31, 0.45)', alignItems: 'center', justifyContent: 'center' }}>
           {/* Confetti */}
           <View pointerEvents="none" style={{ position: 'absolute', left: width / 2, top: '45%' }}>
@@ -99,13 +99,13 @@ function Burst({ what, count }: { what: string; count: number }) {
           <Animated.View style={{ transform: [{ scale }, { rotate }], width: '78%' }}>
             <Sticker color={colors.lime} offset={6} rounded={28} innerStyle={{ padding: 22, gap: 8, alignItems: 'center' }}>
               <Text style={{ fontFamily: fonts.display, fontSize: 40, lineHeight: 42, letterSpacing: -1.2, color: colors.ink }}>
-                Roam sent!
+                {title}
               </Text>
               <Text numberOfLines={2} style={{ fontFamily: fonts.displayBold, fontSize: 20, lineHeight: 24, color: colors.ink, textAlign: 'center' }}>
                 “{what}”
               </Text>
               <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.inkSoft, textAlign: 'center' }}>
-                Out to {count} {count === 1 ? 'person' : 'people'}. Let's see who bites.
+                Out to {count} {count === 1 ? 'person' : 'people'}. {line ?? "Let's see who bites."}
               </Text>
             </Sticker>
           </Animated.View>

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 /** A tiny signal: the send screen fires it, the home screen plays the celebration. */
-export type Sent = { id: number; what: string; count: number };
+export type Sent = { id: number; what: string; count: number; title?: string; line?: string };
 
 let current: Sent | null = null;
 let nextId = 1;

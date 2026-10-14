@@ -35,6 +35,28 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
     onChange?.();
   }
 
+  async function testVote() {
+    setBusy(true);
+    const { error } = await supabase.rpc('seed_mock_open_roam');
+    setBusy(false);
+    if (error) {
+      Alert.alert(
+        "Couldn't start a test vote",
+        error.message.includes('load_test_friends_first')
+          ? 'Load test friends first.'
+          : error.message.includes('seed_mock_open_roam')
+            ? 'Run the open Roams SQL in Supabase first (supabase/migrations/20261015000000_open_roams.sql).'
+            : error.message,
+      );
+      return;
+    }
+    Alert.alert(
+      'Test vote started',
+      "A test friend wants to find a night. Most of the others have voted already. Vote from the Buzzing card on home. The buzzer goes off in 3 minutes, so keep the app open to see it.",
+    );
+    onChange?.();
+  }
+
   function clear() {
     Alert.alert('Remove test friends?', 'They and their Roams disappear. Your circles stay.', [
       { text: 'Keep them', style: 'cancel' },
@@ -60,6 +82,7 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
       </Text>
       <View style={{ gap: 4 }}>
         <Button variant="dashed" label={busy ? 'One sec…' : 'Load test friends'} onPress={load} />
+        <Button variant="dashed" label="Start a test vote (buzzer in 3 min)" onPress={testVote} />
         <Button variant="link" label="Remove test friends" onPress={clear} />
       </View>
     </Sticker>

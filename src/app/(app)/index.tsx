@@ -1,15 +1,18 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddPersonIcon, CirclesIcon, PeopleIcon, PlusIcon } from '@/components/icons';
+import { BuzzerResult } from '@/components/buzzer-result';
+import { OpenRoamCard } from '@/components/open-roam-card';
 import { RoamCard } from '@/components/roam-card';
 import { SentCelebration } from '@/components/sent-celebration';
 import { TestTools } from '@/components/test-tools';
 import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
+import { markBuzzerSeen, resolveDue, seenBuzzers, useOpenRoams, useTick } from '@/lib/open-roams';
 import { effectiveResponse, isActive } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
 
@@ -21,6 +24,28 @@ export default function Feed() {
   const me = userId!;
   const { data: items, loading, error, reload } = useFeed();
   const { data: friends, reload: reloadFriends } = useFriends();
+  const { data: opens, reload: reloadOpens } = useOpenRoams();
+  const tick = useTick(15_000);
+  const [seen, setSeen] = useState(() => seenBuzzers());
+
+  // The buzzer: when one goes off, lock in the winner, then show the result.
+  useEffect(() => {
+    resolveDue(opens, tick).then((n) => {
+      if (n) {
+        reloadOpens();
+        reload();
+      }
+    });
+  }, [opens, tick, reload, reloadOpens]);
+
+  const buzzing = opens
+    .filter((o) => o.status === 'open' && new Date(o.buzzer_at).getTime() > tick)
+    .sort((a, b) => a.buzzer_at.localeCompare(b.buzzer_at));
+  const justBuzzed = opens.find((o) => o.status === 'locked' && !seen.has(o.id));
+  const refreshAll = () => {
+    reload();
+    reloadOpens();
+  };
 
   const sections = useMemo(() => {
     const byStart = (a: FeedItem, b: FeedItem) => a.roam.starts_at.localeCompare(b.roam.starts_at);
@@ -49,14 +74,14 @@ export default function Feed() {
   }, [items, me]);
 
   const now = new Date();
-  const empty = !loading && items.length === 0;
+  const empty = !loading && items.length === 0 && buzzing.length === 0;
   const noFriends = friends.friends.length === 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ground }} edges={['top']}>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140, gap: 14 }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={reload} tintColor={colors.ink} />}>
+        refreshControl={<RefreshControl refreshing={false} onRefresh={refreshAll} tintColor={colors.ink} />}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, marginBottom: 8 }}>
           <View>
             <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.inkSoft }}>
@@ -104,6 +129,19 @@ export default function Feed() {
 
         {/* Feed order (v1): what you've committed to, then what you're hosting, then what's waiting on you.
             Revisit once calendar integrations exist (v2). */}
+        {buzzing.length ? (
+          <View style={{ gap: 12, marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.yellow, borderWidth: 2, borderColor: colors.ink }} />
+              <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>
+                BUZZING · {buzzing.length}
+              </Text>
+            </View>
+            {buzzing.map((o) => (
+              <OpenRoamCard key={o.id} o={o} me={me} now={tick} />
+            ))}
+          </View>
+        ) : null}
         <Section dot={colors.lilac} title="You're in" items={sections.going} me={me} variant="going" />
         <Section dot={colors.yellow} title="Up for grabs" items={sections.grabs} me={me} variant="grabs" />
         <Section dot={colors.lime} title="Your Roams" items={sections.mine} me={me} variant="mine" />
@@ -120,6 +158,17 @@ export default function Feed() {
 
       <NavBar />
       <SentCelebration />
+      {justBuzzed ? (
+        <BuzzerResult
+          key={justBuzzed.id}
+          o={justBuzzed}
+          me={me}
+          onClose={() => {
+            markBuzzerSeen(justBuzzed.id);
+            setSeen(seenBuzzers());
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

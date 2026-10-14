@@ -5,7 +5,7 @@ import { useAuth } from './auth';
 import { supabase } from './supabase';
 import type { Circle, Invite, InviteRequest, Profile, Roam } from './types';
 
-const PROFILE = 'id, display_name, avatar_url';
+export const PROFILE = 'id, display_name, avatar_url';
 
 /** Re-runs `load` whenever any of these tables change (subject to RLS). */
 function useLive(tables: string[], load: () => void) {
@@ -27,7 +27,7 @@ function useLive(tables: string[], load: () => void) {
   }, [key]);
 }
 
-function useLoader<T>(fetcher: () => Promise<T>, initial: T, live: string[] = []) {
+export function useLoader<T>(fetcher: () => Promise<T>, initial: T, live: string[] = []) {
   const [data, setData] = useState<T>(initial);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

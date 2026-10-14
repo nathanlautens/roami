@@ -20,9 +20,12 @@ One switch in Supabase: **Authentication → Sign In / Providers → Allow anony
 To add friends in testing mode, use the **friend code** on the Friends screen (contacts matching needs phone login).
 
 ### 2a. Test friends (optional)
-Paste `supabase/migrations/20261014230000_mock_friends.sql` into **SQL Editor** and **Run**. Then in the app (dev builds / Expo Go only) tap **Load test friends**, on the Friends screen or the empty home feed. You get 10 mock friends split across 2 crews, 2 Roams waiting for you, and mock friends who answer your Roams instantly. **Remove test friends** clears them.
+Paste `supabase/migrations/20261014230000_mock_friends.sql` into **SQL Editor** and **Run**. Then in the app (dev builds / Expo Go only) tap **Load test friends**, on the Friends screen or the empty home feed. You get 10 mock friends split across 2 circles, 2 Roams waiting for you, and mock friends who answer your Roams instantly. **Remove test friends** clears them.
 
-### 2b. Later: turn on phone login (free, no SMS provider)
+### 2b. Open Roams + the buzzer
+Paste `supabase/migrations/20261015000000_open_roams.sql` into **SQL Editor** and **Run** (after the mock friends SQL). In the app: **+ → Find a night** to pick nights, invite people and set a buzzer. At the buzzer the top night locks into a normal Roam. In dev builds, **Start a test vote** (Friends → Test mode) has a test friend start one with a 3-minute buzzer.
+
+### 2c. Later: turn on phone login (free, no SMS provider)
 Set `SKIP_LOGIN = false` in `src/lib/config.ts`, then:
 
 While testing, login codes aren't texted. They're saved to a table you can read in the dashboard.
@@ -77,4 +80,5 @@ npx expo lint
 npm run test:db
 npm run test:sms-hook
 npm run test:mock
+npm run test:open
 ```

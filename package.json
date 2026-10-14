@@ -54,7 +54,8 @@
     "test:db": "node supabase/tests/schema.test.mjs supabase/migrations/20261014200000_initial_schema.sql",
     "test:sms-hook": "node supabase/tests/sms-hook.test.mjs supabase/migrations/20261014210000_dev_sms_hook.sql",
     "start:dev": "expo start --dev-client",
-    "test:mock": "node supabase/tests/mock-friends.test.mjs"
+    "test:mock": "node supabase/tests/mock-friends.test.mjs",
+    "test:open": "node supabase/tests/open-roams.test.mjs"
   },
   "private": true
 }

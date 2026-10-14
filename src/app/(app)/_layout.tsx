@@ -10,6 +10,7 @@ export default function AppLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="send" options={{ presentation: 'modal' }} />
       <Stack.Screen name="roam/[id]" />
+      <Stack.Screen name="open/[id]" />
       <Stack.Screen name="friends" />
       <Stack.Screen name="circles/index" />
       <Stack.Screen name="circles/[id]" />
