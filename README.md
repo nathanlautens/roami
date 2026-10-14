@@ -12,7 +12,16 @@ In the [Supabase dashboard](https://supabase.com/dashboard/project/iounsooetwcgf
 
 This creates the tables, the privacy rules (row level security), the functions the app calls, live updates, and the `avatars` photo bucket.
 
-### 2. Turn on phone login (free, no SMS provider)
+### 2. Testing mode: no login (current setting)
+`src/lib/config.ts` has `SKIP_LOGIN = true`. Each phone is signed in anonymously in the background, then asked for a name and photo. Nothing else changes: privacy rules and data work exactly as with phone login.
+
+One switch in Supabase: **Authentication → Sign In / Providers → Allow anonymous sign-ins → on → Save**.
+
+To add friends in testing mode, use the **friend code** on the Friends screen (contacts matching needs phone login).
+
+### 2b. Later: turn on phone login (free, no SMS provider)
+Set `SKIP_LOGIN = false` in `src/lib/config.ts`, then:
+
 While testing, login codes aren't texted. They're saved to a table you can read in the dashboard.
 
 1. **SQL Editor → New query**: paste the whole of `supabase/migrations/20261014210000_dev_sms_hook.sql` and **Run**.

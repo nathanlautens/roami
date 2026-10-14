@@ -1,11 +1,12 @@
 import { Contact, ContactField, requestPermissionsAsync } from 'expo-contacts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Share, Text, View } from 'react-native';
+import { Alert, Pressable, Share, Text, TextInput, View } from 'react-native';
 
 import { ShareIcon } from '@/components/icons';
 import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { SKIP_LOGIN } from '@/lib/config';
 import { useFriends } from '@/lib/data';
 import { toE164 } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
@@ -64,8 +65,50 @@ export default function Friends() {
 
   async function shareLink() {
     await Share.share({
-      message: `Come roam with me on Roami. Once you've got the app, tap this to add me: roami://add/${userId}`,
+      message: `Come roam with me on Roami. My friend code is ${myCode}, or tap this once you've got the app: roami://add/${userId}`,
     });
+  }
+
+  // Friend codes: the first 8 characters of someone's id, e.g. "3F9A12BC".
+  const myCode = userId ? userId.slice(0, 8).toUpperCase() : '';
+  const [code, setCode] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  async function addByCode() {
+    const clean = code.trim().toLowerCase().replace(/[^0-9a-f]/g, '');
+    if (clean.length !== 8) {
+      Alert.alert('Hmm', 'Friend codes are 8 letters and numbers.');
+      return;
+    }
+    if (clean === myCode.toLowerCase()) {
+      Alert.alert("That's you, babe", 'Ask your friend for their code.');
+      return;
+    }
+    setAdding(true);
+    const { data: found } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .gte('id', `${clean}-0000-0000-0000-000000000000`)
+      .lte('id', `${clean}-ffff-ffff-ffff-ffffffffffff`)
+      .not('display_name', 'is', null)
+      .limit(2);
+    if (!found || found.length !== 1) {
+      setAdding(false);
+      Alert.alert('No one by that code', 'Double-check it with your friend?');
+      return;
+    }
+    const { data: status, error } = await supabase.rpc('add_friend', { p_target: found[0].id });
+    setAdding(false);
+    if (error) {
+      Alert.alert('Hmm', 'Something went sideways. Try again?');
+      return;
+    }
+    setCode('');
+    Alert.alert(
+      status === 'accepted' ? `You and ${found[0].display_name} are friends!` : 'Request sent',
+      status === 'accepted' ? 'Go send them a Roam.' : `Once ${found[0].display_name} adds you back, you can roam together.`,
+    );
+    reload();
   }
 
   return (
@@ -78,6 +121,36 @@ export default function Friends() {
       <TopBar onBack={onboarding ? undefined : () => router.back()} />
       <H1 style={{ marginTop: 20, marginBottom: 8 }}>Find your people</H1>
       <Body style={{ marginBottom: 20 }}>Friends have to add each other back. Mutual vibes only.</Body>
+
+      <Sticker color={colors.lime} innerStyle={{ padding: 16, gap: 12 }} style={{ marginBottom: 24 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            <Label>Your friend code</Label>
+            <Text selectable style={{ fontFamily: fonts.display, fontSize: 30, letterSpacing: 2, color: colors.ink }}>{myCode}</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Share your friend code" onPress={shareLink} style={{ width: 44, height: 44, borderRadius: 14, borderWidth: border, borderColor: colors.ink, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
+            <ShareIcon size={20} />
+          </Pressable>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TextInput
+            value={code}
+            onChangeText={setCode}
+            placeholder="Their code"
+            placeholderTextColor="#5E5670"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={9}
+            accessibilityLabel="Friend's code"
+            returnKeyType="done"
+            onSubmitEditing={addByCode}
+            style={{ flex: 1, minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderColor: colors.ink, borderRadius: radius.sm, backgroundColor: colors.white, fontFamily: fonts.bodyBold, fontSize: 17, letterSpacing: 1.5, color: colors.ink }}
+          />
+          <Pressable accessibilityRole="button" onPress={addByCode} disabled={adding} style={{ minHeight: 48, paddingHorizontal: 18, borderRadius: radius.sm, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', opacity: adding ? 0.6 : 1 }}>
+            <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lime }}>{adding ? '…' : 'Add'}</Text>
+          </Pressable>
+        </View>
+      </Sticker>
 
       {data.incoming.length ? (
         <View style={{ marginBottom: 24 }}>
@@ -93,9 +166,9 @@ export default function Friends() {
         </View>
       ) : null}
 
-      <Label>Already on Roami</Label>
+      {SKIP_LOGIN ? null : <Label>Already on Roami</Label>}
       <View style={{ gap: 8, marginTop: 10 }}>
-        {matches === null ? (
+        {SKIP_LOGIN ? null : matches === null ? (
           <Button variant="dashed" label={checking ? 'Checking…' : 'Check my contacts'} onPress={checkContacts} />
         ) : matches.length === 0 ? (
           <Body>None of your contacts are here yet. Send them the link!</Body>

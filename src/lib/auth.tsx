@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
+import { SKIP_LOGIN } from './config';
 import { registerForPush } from './push';
 import { supabase } from './supabase';
 import type { Profile } from './types';
@@ -11,6 +12,9 @@ type AuthState = {
   profile: Profile | null;
   userId: string | null;
   needsProfile: boolean;
+  /** Set when the background (testing-mode) sign-in failed. */
+  loginError: string | null;
+  retryQuickLogin: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -21,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const userId = session?.user.id ?? null;
 
@@ -37,12 +42,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(data ?? { id, display_name: null, avatar_url: null });
   }, []);
 
+  const signInQuietly = useCallback(async () => {
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      setLoginError(error.message);
+      return null;
+    }
+    setLoginError(null);
+    return data.session;
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
-      setSession(data.session);
-      await loadProfile(data.session?.user.id ?? null);
+      let current = data.session;
+      // Testing mode: no phone login, just a background anonymous account.
+      if (!current && SKIP_LOGIN) current = await signInQuietly();
+      if (!mounted) return;
+      setSession(current);
+      await loadProfile(current?.user.id ?? null);
       if (mounted) setReady(true);
     });
 
@@ -56,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [loadProfile]);
+  }, [loadProfile, signInQuietly]);
 
   // Push notifications: best effort, never blocks the app.
   useEffect(() => {
@@ -69,6 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     userId,
     needsProfile: !!session && !profile?.display_name,
+    loginError,
+    retryQuickLogin: async () => {
+      await signInQuietly();
+    },
     refreshProfile: () => loadProfile(userId),
     signOut: async () => {
       await supabase.auth.signOut();

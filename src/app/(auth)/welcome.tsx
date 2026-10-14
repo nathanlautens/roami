@@ -1,11 +1,16 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AvatarStack, Body, Button, H1, Sticker } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+import { SKIP_LOGIN } from '@/lib/config';
 import { colors, fonts } from '@/lib/theme';
 
 export default function Welcome() {
+  const { loginError, retryQuickLogin } = useAuth();
+  const [busy, setBusy] = useState(false);
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ground }}>
       <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 }}>
@@ -39,8 +44,32 @@ export default function Welcome() {
           <Body style={{ fontSize: 17, marginBottom: 12 }}>
             Throw out a Roam, see who bites. No group-chat archaeology required.
           </Body>
-          <Button label="Let's roam" onPress={() => router.push('/phone')} />
-          <Button variant="link" label="Already roaming? Log in" onPress={() => router.push('/phone')} />
+          {SKIP_LOGIN ? (
+            <>
+              {loginError ? (
+                <Sticker color={colors.yellow} shadow={null} innerStyle={{ padding: 14, gap: 4 }}>
+                  <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}>Couldn't get you in</Text>
+                  <Text style={{ fontFamily: fonts.body, fontSize: 14, color: colors.ink }}>
+                    Turn on "Allow anonymous sign-ins" in Supabase (Authentication → Sign In / Providers), then try again.
+                  </Text>
+                </Sticker>
+              ) : null}
+              <Button
+                label="Let's roam"
+                loading={busy}
+                onPress={async () => {
+                  setBusy(true);
+                  await retryQuickLogin();
+                  setBusy(false);
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Button label="Let's roam" onPress={() => router.push('/phone')} />
+              <Button variant="link" label="Already roaming? Log in" onPress={() => router.push('/phone')} />
+            </>
+          )}
         </View>
       </View>
     </SafeAreaView>
