@@ -116,7 +116,7 @@ export default function Friends() {
     <Screen
       footer={
         onboarding ? (
-          <Button label={data.friends.length ? 'Next: start a crew' : 'Skip for now'} onPress={() => router.replace(data.friends.length ? '/crews/new?onboarding=1' : '/')} />
+          <Button label={data.friends.length ? 'Next: start a circle' : 'Skip for now'} onPress={() => router.replace(data.friends.length ? '/circles/new?onboarding=1' : '/')} />
         ) : undefined
       }>
       <TopBar onBack={onboarding ? undefined : () => router.back()} />

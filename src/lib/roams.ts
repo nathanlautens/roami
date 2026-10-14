@@ -159,7 +159,7 @@ export function daysAgo(iso: string | null, now = new Date()) {
   return `last roamed ${d} days ago`;
 }
 
-/** Crews you haven't roamed with in two weeks get a nudge. */
+/** Circles you haven't roamed with in two weeks get a nudge. */
 export function isStale(iso: string | null, now = new Date()) {
   if (!iso) return true;
   return now.getTime() - new Date(iso).getTime() > 14 * 86_400_000;

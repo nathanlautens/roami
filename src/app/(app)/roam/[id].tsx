@@ -33,7 +33,7 @@ export default function RoamScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { userId } = useAuth();
   const me = userId!;
-  const { data, loading, reload } = useRoam(id);
+  const { data, loading, error, reload } = useRoam(id);
   const { data: friends } = useFriends();
 
   const [note, setNote] = useState<string | null>(null);
@@ -50,7 +50,13 @@ export default function RoamScreen() {
     return (
       <Screen>
         <TopBar onBack={() => router.back()} />
-        <H1 style={{ marginTop: 24 }}>This Roam has left the chat.</H1>
+        <H1 style={{ marginTop: 24 }}>{error ? "Couldn't load this Roam." : 'This Roam has left the chat.'}</H1>
+        {error ? (
+          <View style={{ gap: 12, marginTop: 12 }}>
+            <Body>{error}</Body>
+            <Button variant="dashed" label="Try again" onPress={reload} />
+          </View>
+        ) : null}
       </Screen>
     );
   }

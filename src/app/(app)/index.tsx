@@ -3,8 +3,9 @@ import { useMemo } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AddPersonIcon, CrewsIcon, PeopleIcon, PlusIcon } from '@/components/icons';
+import { AddPersonIcon, CirclesIcon, PeopleIcon, PlusIcon } from '@/components/icons';
 import { RoamCard } from '@/components/roam-card';
+import { SentCelebration } from '@/components/sent-celebration';
 import { TestTools } from '@/components/test-tools';
 import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -18,7 +19,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export default function Feed() {
   const { profile, userId } = useAuth();
   const me = userId!;
-  const { data: items, loading, reload } = useFeed();
+  const { data: items, loading, error, reload } = useFeed();
   const { data: friends, reload: reloadFriends } = useFriends();
 
   const sections = useMemo(() => {
@@ -70,10 +71,18 @@ export default function Feed() {
           </Pressable>
         </View>
 
+        {error ? (
+          <Sticker color={colors.yellow} shadow={null} innerStyle={{ padding: 14, gap: 8 }}>
+            <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}>Couldn't load your Roams</Text>
+            <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.ink }}>{error}</Text>
+            <Button variant="dashed" label="Try again" onPress={reload} />
+          </Sticker>
+        ) : null}
+
         {noFriends && !loading ? (
           <Sticker color={colors.yellow} innerStyle={{ padding: 18, gap: 10 }}>
             <Text style={{ fontFamily: fonts.display, fontSize: 24, color: colors.ink }}>Suspiciously quiet.</Text>
-            <Body style={{ color: colors.ink }}>Add your friends, make a crew, then throw out your first Roam.</Body>
+            <Body style={{ color: colors.ink }}>Add your friends, make a circle, then throw out your first Roam.</Body>
             <Button label="Find your people" onPress={() => router.push('/friends?onboarding=1')} />
           </Sticker>
         ) : null}
@@ -108,6 +117,7 @@ export default function Feed() {
       </ScrollView>
 
       <NavBar />
+      <SentCelebration />
     </SafeAreaView>
   );
 }
@@ -177,8 +187,8 @@ function NavBar() {
           <PlusIcon size={30} />
         </Pressable>
 
-        <NavItem label="Crews" onPress={() => router.push('/crews')}>
-          <CrewsIcon size={24} color={colors.white} />
+        <NavItem label="Circles" onPress={() => router.push('/circles')}>
+          <CirclesIcon size={24} color={colors.white} />
         </NavItem>
       </View>
     </SafeAreaView>

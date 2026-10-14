@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
 import { supabase } from './supabase';
-import type { Crew, Invite, InviteRequest, Profile, Roam } from './types';
+import type { Circle, Invite, InviteRequest, Profile, Roam } from './types';
 
 const PROFILE = 'id, display_name, avatar_url';
 
@@ -91,10 +91,10 @@ export function useFriends() {
   );
 }
 
-// ─── Crews ──────────────────────────────────────────────────────
+// ─── Circles ──────────────────────────────────────────────────────
 
-export function useCrews() {
-  return useLoader<Crew[]>(async () => {
+export function useCircles() {
+  return useLoader<Circle[]>(async () => {
     const [{ data, error }, { data: last }] = await Promise.all([
       supabase
         .from('crews')
@@ -131,7 +131,7 @@ export function useFeed() {
       const since = new Date(Date.now() - 24 * 3600_000).toISOString();
       const { data: mine, error } = await supabase
         .from('roam_invites')
-        .select(`roam_id, user_id, response, note, responded_at, roam:roams!inner(*, host:profiles(${PROFILE}))`)
+        .select(`roam_id, user_id, response, note, responded_at, roam:roams!inner(*, host:profiles!roams_host_id_fkey(${PROFILE}))`)
         .eq('user_id', userId)
         .gte('roam.ends_at', since);
       if (error) throw error;
@@ -169,7 +169,7 @@ export function useRoam(id: string) {
   return useLoader<RoamDetail>(
     async () => {
       const [{ data: roam, error }, { data: invites }, { data: requests }] = await Promise.all([
-        supabase.from('roams').select(`*, host:profiles(${PROFILE})`).eq('id', id).maybeSingle(),
+        supabase.from('roams').select(`*, host:profiles!roams_host_id_fkey(${PROFILE})`).eq('id', id).maybeSingle(),
         supabase
           .from('roam_invites')
           .select(`roam_id, user_id, response, note, responded_at, profile:profiles(${PROFILE})`)
@@ -196,7 +196,7 @@ export function useRoam(id: string) {
 export async function findClashes(userId: string, roam: Roam): Promise<Roam[]> {
   const { data } = await supabase
     .from('roam_invites')
-    .select(`roam:roams!inner(*, host:profiles(${PROFILE}))`)
+    .select(`roam:roams!inner(*, host:profiles!roams_host_id_fkey(${PROFILE}))`)
     .eq('user_id', userId)
     .eq('response', 'in')
     .neq('roam_id', roam.id)

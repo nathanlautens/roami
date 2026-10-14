@@ -48,8 +48,8 @@ export const PeopleIcon = (p: Props) => (
     <Path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M15 15.5c3 0 5.5 1.8 5.5 4.5" />
   </Svg>
 );
-/** Crews: little groups of people. */
-export const CrewsIcon = (p: Props) => (
+/** Circles: little groups of people. */
+export const CirclesIcon = (p: Props) => (
   <Svg {...base({ strokeWidth: 2.2, ...p })}>
     <Circle cx="12" cy="6.5" r="3" />
     <Circle cx="6" cy="16" r="3" />

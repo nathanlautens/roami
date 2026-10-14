@@ -31,7 +31,7 @@ export type Invite = {
   profile?: Profile | null;
 };
 
-export type Crew = {
+export type Circle = {
   id: string;
   name: string;
   members: Profile[];

@@ -5,8 +5,9 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View
 
 import { PinIcon } from '@/components/icons';
 import { Avatar, Body, Button, Checkbox, Chip, Field, Label, Screen, Tag, TopBar } from '@/components/ui';
-import { useCrews, useFriends } from '@/lib/data';
+import { useCircles, useFriends } from '@/lib/data';
 import { daysAgo, friendlyError, isStale, PROMPTS, VIBES, WHENS, windowFor, type WhenId } from '@/lib/roams';
+import { celebrateSent } from '@/lib/celebrate';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Vibe } from '@/lib/types';
@@ -15,10 +16,10 @@ const SPOTS: (number | null)[] = [null, 2, 4, 6, 10];
 
 export default function SendRoam() {
   const params = useLocalSearchParams<{ what?: string; to?: string }>();
-  const { data: crews } = useCrews();
+  const { data: circles } = useCircles();
   const { data: friends } = useFriends();
 
-  const [crewIds, setCrewIds] = useState<Set<string>>(new Set());
+  const [circleIds, setCircleIds] = useState<Set<string>>(new Set());
   const [people, setPeople] = useState<Set<string>>(new Set(params.to ? params.to.split(',') : []));
   const [showPeople, setShowPeople] = useState(!!params.to);
   const [what, setWhat] = useState(params.what ?? '');
@@ -31,9 +32,9 @@ export default function SendRoam() {
 
   const invitees = useMemo(() => {
     const ids = new Set(people);
-    for (const c of crews) if (crewIds.has(c.id)) c.members.forEach((m) => ids.add(m.id));
+    for (const c of circles) if (circleIds.has(c.id)) c.members.forEach((m) => ids.add(m.id));
     return ids;
-  }, [crews, crewIds, people]);
+  }, [circles, circleIds, people]);
 
   function toggle(set: Set<string>, setter: (s: Set<string>) => void, id: string) {
     Haptics.selectionAsync().catch(() => {});
@@ -47,7 +48,7 @@ export default function SendRoam() {
     if (!what.trim() || invitees.size === 0) return;
     setSending(true);
     const { start, end } = windowFor(when);
-    const { data, error } = await supabase.rpc('send_roam', {
+    const { error } = await supabase.rpc('send_roam', {
       p_what: what.trim(),
       p_vibe: vibe,
       p_location: where.trim() || null,
@@ -61,8 +62,9 @@ export default function SendRoam() {
       Alert.alert('Not sent', friendlyError(error));
       return;
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    router.replace(`/roam/${data as string}`);
+    // Back to home, where the "Roam sent!" celebration plays over the feed.
+    celebrateSent({ what: what.trim(), count: invitees.size });
+    router.dismissTo('/');
   }
 
   const n = invitees.size;
@@ -81,14 +83,14 @@ export default function SendRoam() {
           </View>
         ) : (
           <View style={{ gap: 8, marginTop: 8 }}>
-            {crews.map((c) => {
-              const on = crewIds.has(c.id);
+            {circles.map((c) => {
+              const on = circleIds.has(c.id);
               return (
                 <Pressable
                   key={c.id}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: on }}
-                  onPress={() => toggle(crewIds, setCrewIds, c.id)}
+                  onPress={() => toggle(circleIds, setCircleIds, c.id)}
                   style={[row, { backgroundColor: on ? colors.lime : colors.white }]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{c.name}</Text>
@@ -106,13 +108,13 @@ export default function SendRoam() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
                 {friends.friends.map((f) => {
                   const on = invitees.has(f.id);
-                  const viaCrew = on && !people.has(f.id);
+                  const viaCircle = on && !people.has(f.id);
                   return (
                     <Pressable
                       key={f.id}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: on }}
-                      onPress={() => !viaCrew && toggle(people, setPeople, f.id)}
+                      onPress={() => !viaCircle && toggle(people, setPeople, f.id)}
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -124,7 +126,7 @@ export default function SendRoam() {
                         borderWidth: 2,
                         borderColor: colors.ink,
                         backgroundColor: on ? colors.lime : colors.white,
-                        opacity: viaCrew ? 0.6 : 1,
+                        opacity: viaCircle ? 0.6 : 1,
                       }}>
                       <Avatar profile={f} size={30} />
                       <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }}>{f.display_name}</Text>
@@ -133,7 +135,7 @@ export default function SendRoam() {
                 })}
               </View>
             ) : (
-              <Button variant="dashed" label={crews.length ? 'Or pick people one by one' : 'Pick people'} onPress={() => setShowPeople(true)} />
+              <Button variant="dashed" label={circles.length ? 'Or pick people one by one' : 'Pick people'} onPress={() => setShowPeople(true)} />
             )}
           </View>
         )}

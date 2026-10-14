@@ -30,13 +30,13 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
     }
     Alert.alert(
       `${data} test friends loaded`,
-      "They're split across 2 crews (Uni lot and Work wives), and 2 of them have sent you Roams. They'll answer any Roam you send them.",
+      "They're split across 2 circles (Uni lot and Work wives), and 2 of them have sent you Roams. They'll answer any Roam you send them.",
     );
     onChange?.();
   }
 
   function clear() {
-    Alert.alert('Remove test friends?', 'They and their Roams disappear. Your crews stay.', [
+    Alert.alert('Remove test friends?', 'They and their Roams disappear. Your circles stay.', [
       { text: 'Keep them', style: 'cancel' },
       {
         text: 'Remove',

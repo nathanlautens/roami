@@ -11,8 +11,8 @@ export default function AppLayout() {
       <Stack.Screen name="send" options={{ presentation: 'modal' }} />
       <Stack.Screen name="roam/[id]" />
       <Stack.Screen name="friends" />
-      <Stack.Screen name="crews/index" />
-      <Stack.Screen name="crews/[id]" />
+      <Stack.Screen name="circles/index" />
+      <Stack.Screen name="circles/[id]" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="add/[id]" options={{ presentation: 'modal' }} />
     </Stack>
