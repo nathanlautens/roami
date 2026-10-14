@@ -45,13 +45,14 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "start": "expo start --go",
+    "android": "expo start --go --android",
+    "ios": "expo start --go --ios",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test:db": "node supabase/tests/schema.test.mjs supabase/migrations/20261014200000_initial_schema.sql",
-    "test:sms-hook": "node supabase/tests/sms-hook.test.mjs supabase/migrations/20261014210000_dev_sms_hook.sql"
+    "test:sms-hook": "node supabase/tests/sms-hook.test.mjs supabase/migrations/20261014210000_dev_sms_hook.sql",
+    "start:dev": "expo start --dev-client"
   },
   "private": true
 }

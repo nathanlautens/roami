@@ -35,7 +35,7 @@ Before real users: disable the hook and connect a real SMS provider (e.g. Twilio
 ### 3. Run it on your phone
 ```bash
 npm install
-npx expo start
+npm start
 ```
 Scan the QR code with the **Expo Go** app (iOS) or the camera.
 
