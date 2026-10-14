@@ -48,6 +48,15 @@ export const PeopleIcon = (p: Props) => (
     <Path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M15 15.5c3 0 5.5 1.8 5.5 4.5" />
   </Svg>
 );
+/** Crews: little groups of people. */
+export const CrewsIcon = (p: Props) => (
+  <Svg {...base({ strokeWidth: 2.2, ...p })}>
+    <Circle cx="12" cy="6.5" r="3" />
+    <Circle cx="6" cy="16" r="3" />
+    <Circle cx="18" cy="16" r="3" />
+    <Path d="M10.2 9l-2.4 4.4M13.8 9l2.4 4.4M9 16h6" />
+  </Svg>
+);
 export const AddPersonIcon = (p: Props) => (
   <Svg {...base(p)}>
     <Circle cx="9" cy="8" r="3.5" />

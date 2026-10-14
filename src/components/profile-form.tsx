@@ -25,8 +25,9 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
       setUploading(true);
       const url = await pickAndUploadAvatar(userId);
       if (url) setAvatarUrl(url);
-    } catch {
-      Alert.alert("Couldn't upload that", 'Try a different photo?');
+    } catch (e) {
+      const reason = (e as { message?: string })?.message;
+      Alert.alert("Couldn't upload that", reason ? `Try a different photo? (${reason})` : 'Try a different photo?');
     } finally {
       setUploading(false);
     }

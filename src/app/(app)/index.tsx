@@ -3,13 +3,13 @@ import { useMemo } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AddPersonIcon, PeopleIcon, PlusIcon } from '@/components/icons';
+import { AddPersonIcon, CrewsIcon, PeopleIcon, PlusIcon } from '@/components/icons';
 import { RoamCard } from '@/components/roam-card';
 import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
 import { effectiveResponse, isActive } from '@/lib/roams';
-import { border, colors, fonts } from '@/lib/theme';
+import { colors, fonts } from '@/lib/theme';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -141,7 +141,7 @@ function NavBar() {
     <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 16, right: 16, bottom: 8 }} pointerEvents="box-none">
       <View
         style={{
-          height: 72,
+          height: 76,
           backgroundColor: colors.ink,
           borderRadius: 26,
           flexDirection: 'row',
@@ -149,33 +149,50 @@ function NavBar() {
           justifyContent: 'space-around',
           paddingHorizontal: 12,
         }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Friends" onPress={() => router.push('/friends')} style={navBtn}>
-          <AddPersonIcon size={26} color={colors.white} strokeWidth={2.2} />
-        </Pressable>
+        <NavItem label="Friends" onPress={() => router.push('/friends')}>
+          <PeopleIcon size={24} color={colors.white} />
+        </NavItem>
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Send a Roam"
           onPress={() => router.push('/send')}
-          style={{
-            width: 64,
-            height: 64,
-            marginTop: -36,
-            borderRadius: 22,
-            backgroundColor: colors.pink,
-            borderWidth: 3,
-            borderColor: colors.ink,
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: [{ rotate: '-6deg' }],
-          }}>
-          <PlusIcon size={30} />
+          style={{ alignItems: 'center', width: 88 }}>
+          <View
+            style={{
+              width: 60,
+              height: 60,
+              marginTop: -30,
+              borderRadius: 20,
+              backgroundColor: colors.pink,
+              borderWidth: 3,
+              borderColor: colors.ink,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [{ rotate: '-6deg' }],
+            }}>
+            <PlusIcon size={28} />
+          </View>
+          <Text style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.pink, marginTop: 4 }}>Send a Roam</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Crews" onPress={() => router.push('/crews')} style={navBtn}>
-          <PeopleIcon size={26} color={colors.white} />
-        </Pressable>
+
+        <NavItem label="Crews" onPress={() => router.push('/crews')}>
+          <CrewsIcon size={24} color={colors.white} />
+        </NavItem>
       </View>
     </SafeAreaView>
   );
 }
 
-const navBtn = { width: 52, height: 52, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: border, borderColor: 'transparent' };
+function NavItem({ label, onPress, children }: { label: string; onPress: () => void; children: React.ReactNode }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => ({ alignItems: 'center', justifyContent: 'center', minWidth: 72, minHeight: 56, gap: 4, opacity: pressed ? 0.6 : 1 })}>
+      {children}
+      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.white }}>{label}</Text>
+    </Pressable>
+  );
+}
