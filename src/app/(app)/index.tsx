@@ -102,10 +102,12 @@ export default function Feed() {
           </Pressable>
         ) : null}
 
+        {/* Feed order (v1): what you've committed to, then what you're hosting, then what's waiting on you.
+            Revisit once calendar integrations exist (v2). */}
+        <Section dot={colors.lilac} title="You're in" items={sections.going} me={me} variant="going" />
         <Section dot={colors.yellow} title="Up for grabs" items={sections.grabs} me={me} variant="grabs" />
-        <Section dot={colors.pink} title="Waiting on you" items={sections.waiting} me={me} variant="hot" />
         <Section dot={colors.lime} title="Your Roams" items={sections.mine} me={me} variant="mine" />
-        <Section dot={colors.lilac} title="You're in" items={sections.going} me={me} variant="quiet" />
+        <Section dot={colors.pink} title="Waiting on you" items={sections.waiting} me={me} variant="hot" />
         <Section dot={colors.mute} title="Recently" items={sections.recent} me={me} variant="quiet" />
 
         {empty && !noFriends ? (
@@ -133,7 +135,7 @@ function Section({
   title: string;
   items: FeedItem[];
   me: string;
-  variant: 'hot' | 'mine' | 'grabs' | 'quiet';
+  variant: 'going' | 'hot' | 'mine' | 'grabs' | 'quiet';
 }) {
   if (!items.length) return null;
   return (

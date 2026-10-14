@@ -7,7 +7,7 @@ import { colors, fonts } from '@/lib/theme';
 import { ChevronIcon, PinIcon } from './icons';
 import { Avatar, AvatarStack, namesIn, Sticker, Tag } from './ui';
 
-type Variant = 'hot' | 'mine' | 'grabs' | 'quiet';
+type Variant = 'going' | 'hot' | 'mine' | 'grabs' | 'quiet';
 
 export function RoamCard({ item, me, variant }: { item: FeedItem; me: string; variant: Variant }) {
   const { roam, ins } = item;
@@ -33,7 +33,8 @@ export function RoamCard({ item, me, variant }: { item: FeedItem; me: string; va
     );
   }
 
-  const bg = variant === 'hot' ? colors.pink : variant === 'mine' ? colors.lime : colors.yellow;
+  const bg =
+    variant === 'going' ? colors.lilac : variant === 'hot' ? colors.pink : variant === 'mine' ? colors.lime : colors.yellow;
   const vibe = vibeLabel(roam.vibe);
 
   return (
@@ -48,11 +49,13 @@ export function RoamCard({ item, me, variant }: { item: FeedItem; me: string; va
             <Tag label={STATE_LABEL[state]} dark />
           ) : variant === 'grabs' ? (
             <Tag label="Up for grabs" dark />
+          ) : variant === 'going' ? (
+            <Tag label="You're in" dark />
           ) : vibe ? (
             <Tag label={vibe} dark />
           ) : null}
         </View>
-        <Text style={{ fontFamily: fonts.display, fontSize: variant === 'hot' ? 28 : 24, lineHeight: variant === 'hot' ? 30 : 27, letterSpacing: -0.6, color: colors.ink }}>
+        <Text style={{ fontFamily: fonts.display, fontSize: variant === 'hot' || variant === 'going' ? 28 : 24, lineHeight: variant === 'hot' || variant === 'going' ? 30 : 27, letterSpacing: -0.6, color: colors.ink }}>
           {roam.what}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
