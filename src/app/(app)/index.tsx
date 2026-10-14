@@ -157,23 +157,19 @@ function NavBar() {
           accessibilityRole="button"
           accessibilityLabel="Send a Roam"
           onPress={() => router.push('/send')}
-          style={{ alignItems: 'center', width: 88 }}>
-          <View
-            style={{
-              width: 60,
-              height: 60,
-              marginTop: -30,
-              borderRadius: 20,
-              backgroundColor: colors.pink,
-              borderWidth: 3,
-              borderColor: colors.ink,
-              alignItems: 'center',
-              justifyContent: 'center',
-              transform: [{ rotate: '-6deg' }],
-            }}>
-            <PlusIcon size={28} />
-          </View>
-          <Text style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.pink, marginTop: 4 }}>Send a Roam</Text>
+          style={{
+            width: 64,
+            height: 64,
+            marginTop: -34,
+            borderRadius: 22,
+            backgroundColor: colors.pink,
+            borderWidth: 3,
+            borderColor: colors.ink,
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: [{ rotate: '-6deg' }],
+          }}>
+          <PlusIcon size={30} />
         </Pressable>
 
         <NavItem label="Crews" onPress={() => router.push('/crews')}>
