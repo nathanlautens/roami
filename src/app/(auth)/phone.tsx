@@ -36,7 +36,7 @@ export default function PhoneLogin() {
     }
     setSentTo(phone);
     setCode('');
-    setResendIn(30);
+    setResendIn(60);
     setTimeout(() => codeRef.current?.focus(), 300);
   }
 
@@ -141,7 +141,7 @@ export default function PhoneLogin() {
             <View style={{ marginTop: 6 }}>
               {resendIn > 0 ? (
                 <Text style={{ fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft, marginTop: 10 }}>
-                  Nothing yet? Resend in 0:{String(resendIn).padStart(2, '0')}
+                  Nothing yet? Resend in {Math.floor(resendIn / 60)}:{String(resendIn % 60).padStart(2, '0')}
                 </Text>
               ) : (
                 <Button variant="link" label="Resend the code" onPress={sendCode} />
