@@ -128,12 +128,13 @@ export function useFeed() {
   return useLoader<FeedItem[]>(
     async () => {
       if (!userId) return [];
-      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const since = new Date().toISOString();
       const { data: mine, error } = await supabase
         .from('roam_invites')
         .select(`roam_id, user_id, response, note, responded_at, roam:roams!inner(*, host:profiles!roams_host_id_fkey(${PROFILE}))`)
         .eq('user_id', userId)
-        .gte('roam.ends_at', since);
+        .gt('roam.ends_at', since)
+        .neq('roam.status', 'cancelled');
       if (error) throw error;
 
       const ids = (mine ?? []).map((m) => m.roam_id);
@@ -204,4 +205,43 @@ export async function findClashes(userId: string, roam: Roam): Promise<Roam[]> {
     .lt('roam.starts_at', roam.ends_at)
     .gt('roam.ends_at', roam.starts_at);
   return ((data ?? []) as unknown as { roam: Roam }[]).map((r) => r.roam);
+}
+
+// ─── Archive ────────────────────────────────────────────────────
+
+/** Roams that are over or were called off, newest first. */
+export function useArchive() {
+  const { userId } = useAuth();
+  return useLoader<FeedItem[]>(
+    async () => {
+      if (!userId) return [];
+      const now = new Date().toISOString();
+      const { data: mine, error } = await supabase
+        .from('roam_invites')
+        .select(`roam_id, user_id, response, note, responded_at, roam:roams!inner(*, host:profiles!roams_host_id_fkey(${PROFILE}))`)
+        .eq('user_id', userId)
+        .or(`ends_at.lte.${now},status.eq.cancelled`, { referencedTable: 'roam' })
+        .order('starts_at', { referencedTable: 'roam', ascending: false })
+        .limit(200);
+      if (error) throw error;
+
+      const ids = (mine ?? []).map((m) => m.roam_id);
+      if (!ids.length) return [];
+      const { data: ins, error: insError } = await supabase
+        .from('roam_invites')
+        .select(`roam_id, user_id, response, note, responded_at, profile:profiles(${PROFILE})`)
+        .in('roam_id', ids)
+        .eq('response', 'in');
+      if (insError) throw insError;
+
+      return (mine ?? [])
+        .map((m) => ({
+          roam: m.roam as unknown as Roam,
+          mine: { roam_id: m.roam_id, user_id: m.user_id, response: m.response, note: m.note, responded_at: m.responded_at },
+          ins: ((ins ?? []) as unknown as Invite[]).filter((i) => i.roam_id === m.roam_id),
+        }))
+        .sort((a, b) => b.roam.starts_at.localeCompare(a.roam.starts_at)) as FeedItem[];
+    },
+    [],
+  );
 }

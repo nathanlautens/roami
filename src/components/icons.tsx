@@ -78,3 +78,10 @@ export const ClashIcon = (p: Props) => (
     <Path d="M3 10h18M8 3v4M16 3v4M9.5 14.5l5 5M14.5 14.5l-5 5" />
   </Svg>
 );
+export const MoreIcon = (p: Props) => (
+  <Svg {...base({ strokeWidth: 3, ...p })}>
+    <Circle cx="5" cy="12" r="1" />
+    <Circle cx="12" cy="12" r="1" />
+    <Circle cx="19" cy="12" r="1" />
+  </Svg>
+);

@@ -3,7 +3,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
-import { AddPersonIcon, ClashIcon, PinIcon } from '@/components/icons';
+import { AddPersonIcon, ClashIcon, MoreIcon, PinIcon } from '@/components/icons';
+import { SafetySheet } from '@/components/safety-sheet';
 import { Avatar, Body, Button, Checkbox, Chip, H1, Label, Loading, Screen, Sheet, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { findClashes, useFriends, useRoam } from '@/lib/data';
@@ -17,7 +18,9 @@ import {
   STATE_LABEL,
   vibeLabel,
 } from '@/lib/roams';
+import { busyLabel, calendarAvailable, calendarPrefs, defaultCalendarId, requestCalendarAccess, setCalendarPrefs, syncCalendar } from '@/lib/calendar';
 import { supabase } from '@/lib/supabase';
+import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Response, Roam } from '@/lib/types';
 
@@ -43,6 +46,12 @@ export default function RoamScreen() {
   const [bailOpen, setBailOpen] = useState(false);
   const [bailNote, setBailNote] = useState(BAIL_REASONS[0]);
   const [bringOpen, setBringOpen] = useState(false);
+  const [safetyOpen, setSafetyOpen] = useState(false);
+
+  const calBusy = useBusy(
+    data.roam ? new Date(data.roam.starts_at) : null,
+    data.roam ? new Date(data.roam.ends_at) : null,
+  );
 
   if (loading && !data.roam) return <Loading />;
   const roam = data.roam;
@@ -80,6 +89,7 @@ export default function RoamScreen() {
     }
     success?.();
     reload();
+    syncCalendar(me);
     return true;
   }
 
@@ -97,7 +107,26 @@ export default function RoamScreen() {
       }
     }
     const ok = await respond(response);
-    if (ok && response === 'in') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (ok && response === 'in') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      offerCalendar();
+    }
+  }
+
+  // Once: "Want Roams you're in on added to your calendar?"
+  function offerCalendar() {
+    if (!calendarAvailable || calendarPrefs().asked) return;
+    Alert.alert('Add it to your calendar?', "We'll add Roams you're in on, and take them off if plans change.", [
+      { text: 'Not now', onPress: () => setCalendarPrefs({}) },
+      {
+        text: 'Add them',
+        onPress: async () => {
+          if (!(await requestCalendarAccess())) return setCalendarPrefs({});
+          setCalendarPrefs({ sync: true, showPlans: true, calendarId: await defaultCalendarId() });
+          syncCalendar(me);
+        },
+      },
+    ]);
   }
 
   async function resolveClash(chaos: boolean) {
@@ -156,7 +185,22 @@ export default function RoamScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen>
-        <TopBar onBack={() => router.back()} right={active ? <Tag label={startsIn(roam)} /> : <Tag label={STATE_LABEL[state]} dark />} />
+        <TopBar
+          onBack={() => router.back()}
+          right={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {active ? <Tag label={startsIn(roam)} /> : <Tag label={STATE_LABEL[state]} dark />}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Report or block"
+                onPress={() => setSafetyOpen(true)}
+                hitSlop={8}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <MoreIcon size={20} />
+              </Pressable>
+            </View>
+          }
+        />
 
         {/* The Roam */}
         <Sticker
@@ -189,6 +233,19 @@ export default function RoamScreen() {
             </Text>
           ) : null}
         </Sticker>
+
+        {calBusy && active && myResponse !== 'in' && !amHost ? (
+          <Sticker shadow={null} color={calBusy.length ? colors.yellow : colors.white} style={{ marginTop: 18 }} innerStyle={{ padding: 12, gap: 2 }}>
+            <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }}>
+              {calBusy.length ? 'Already on your calendar then' : 'Your calendar is free then ✨'}
+            </Text>
+            {calBusy.slice(0, 3).map((e, i) => (
+              <Text key={i} style={{ fontFamily: fonts.body, fontSize: 14, color: colors.ink }}>
+                {busyLabel(e)}
+              </Text>
+            ))}
+          </Sticker>
+        ) : null}
 
         {state === 'up_for_grabs' ? (
           <Sticker shadow={null} color={colors.white} style={{ marginTop: 18 }} innerStyle={{ padding: 14 }}>
@@ -405,6 +462,13 @@ export default function RoamScreen() {
         </ScrollView>
         <Button variant="link" label="Never mind" onPress={() => setBringOpen(false)} />
       </Sheet>
+      <SafetySheet
+        visible={safetyOpen}
+        onClose={() => setSafetyOpen(false)}
+        roamId={roam.id}
+        person={amHost ? null : roam.host}
+        onBlocked={() => router.back()}
+      />
     </KeyboardAvoidingView>
   );
 }

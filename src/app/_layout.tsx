@@ -3,7 +3,7 @@ import {
   BricolageGrotesque_800ExtraBold,
 } from '@expo-google-fonts/bricolage-grotesque';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold, useFonts } from '@expo-google-fonts/dm-sans';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -14,6 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LockScreen } from '@/components/lock-screen';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { isUnlockEnabled } from '@/lib/biometric';
+import { listenForPushTaps } from '@/lib/push';
 import { colors } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -31,6 +32,14 @@ function Routes() {
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);
+
+  // Tapping a push notification opens the Roam (or screen) it's about.
+  const canOpenLinks = ready && !!session && !needsProfile;
+  useEffect(() => {
+    if (!canOpenLinks) return;
+     
+    return listenForPushTaps((url) => router.push(url as any));
+  }, [canOpenLinks]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {

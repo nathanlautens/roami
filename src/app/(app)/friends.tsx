@@ -2,7 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, Share, Text, TextInput, View } from 'react-native';
 
-import { ShareIcon } from '@/components/icons';
+import { MoreIcon, ShareIcon } from '@/components/icons';
+import { SafetySheet } from '@/components/safety-sheet';
 import { TestTools } from '@/components/test-tools';
 import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -16,6 +17,7 @@ export default function Friends() {
   const { userId } = useAuth();
   const { data, reload } = useFriends();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [safetyFor, setSafetyFor] = useState<Profile | null>(null);
 
 
   async function add(id: string) {
@@ -145,7 +147,16 @@ export default function Friends() {
           <Label>Your friends · {data.friends.length}</Label>
           <View style={{ gap: 8, marginTop: 10 }}>
             {data.friends.map((p) => (
-              <Row key={p.id} profile={p} />
+              <Row key={p.id} profile={p}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`More options for ${p.display_name}`}
+                  onPress={() => setSafetyFor(p)}
+                  hitSlop={8}
+                  style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                  <MoreIcon size={20} />
+                </Pressable>
+              </Row>
             ))}
           </View>
         </View>
@@ -163,6 +174,7 @@ export default function Friends() {
           </View>
         </View>
       ) : null}
+      <SafetySheet visible={!!safetyFor} person={safetyFor} onClose={() => setSafetyFor(null)} onBlocked={reload} />
     </Screen>
   );
 }

@@ -18,7 +18,9 @@ import {
   type OpenRoam,
 } from '@/lib/open-roams';
 import { VIBES } from '@/lib/roams';
+import { busyLabel } from '@/lib/calendar';
 import { supabase } from '@/lib/supabase';
+import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Vibe } from '@/lib/types';
 
@@ -81,6 +83,16 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
     vibeVotes: [...o.vibeVotes.filter((v) => v.user_id !== me), ...[...vibes].map((v) => ({ user_id: me, vibe: v }))],
   });
   const maxFree = Math.max(1, ...o.nights.map((n) => s.freeBy.get(n)?.length ?? 0));
+
+  // What's already on your calendar on each night (if you've turned that on).
+  const firstNight = o.nights[0] ? new Date(o.nights[0]) : null;
+  const lastNight = o.nights.at(-1) ? new Date(new Date(o.nights.at(-1)!).getTime() + 6 * 3600_000) : null;
+  const calBusy = useBusy(firstNight ? new Date(firstNight.getTime() - 2 * 3600_000) : null, lastNight);
+  const busyOn = (night: string) => {
+    const start = new Date(night).getTime() - 2 * 3600_000; // from 5pm
+    const end = new Date(night).getTime() + 5 * 3600_000;
+    return (calBusy ?? []).filter((e) => e.start.getTime() < end && e.end.getTime() > start);
+  };
   const profileOf = (uid: string) => o.people.find((p) => p.user_id === uid)?.profile;
 
   function toggle<T>(set: Set<T>, setter: (s: Set<T>) => void, v: T) {
@@ -182,6 +194,12 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
                   <Text numberOfLines={1} style={{ fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.inkSoft }}>
                     {free.length} free{names.length ? ` · ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` +${names.length - 3}` : ''}` : ''}
                   </Text>
+                  {busyOn(n).length ? (
+                    <Text numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.violet }}>
+                      📅 You've got {busyLabel(busyOn(n)[0])}
+                      {busyOn(n).length > 1 ? ` +${busyOn(n).length - 1}` : ''}
+                    </Text>
+                  ) : null}
                 </View>
                 <View style={{ width: 26, height: 26, borderRadius: 8, borderWidth: border, borderColor: colors.ink, backgroundColor: on ? colors.lime : colors.white, alignItems: 'center', justifyContent: 'center' }}>
                   {on ? <CheckIcon size={15} /> : null}

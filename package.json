@@ -8,6 +8,7 @@
     "@expo/ui": "~57.0.24",
     "@supabase/supabase-js": "^2.117.3",
     "expo": "~57.0.29",
+    "expo-calendar": "~57.0.5",
     "expo-constants": "~57.0.22",
     "expo-dev-client": "~57.0.20",
     "expo-device": "~57.0.2",
@@ -43,6 +44,7 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
+    "playwright-core": "^1.56.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -56,7 +58,9 @@
     "start:dev": "expo start --dev-client",
     "test:mock": "node supabase/tests/mock-friends.test.mjs",
     "test:open": "node supabase/tests/open-roams.test.mjs",
-    "test:release": "node supabase/tests/release.test.mjs"
+    "test:release": "node supabase/tests/release.test.mjs",
+    "screenshots": "node store/make-screenshots.mjs",
+    "test:push": "node supabase/tests/safety-push.test.mjs"
   },
   "private": true
 }

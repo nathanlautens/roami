@@ -10,6 +10,7 @@ import { daysAgo, friendlyError, isStale, PROMPTS, VIBES, WHENS, windowFor, type
 import { celebrateSent } from '@/lib/celebrate';
 import { openRoamError } from '@/lib/open-roams';
 import { supabase } from '@/lib/supabase';
+import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Vibe } from '@/lib/types';
 
@@ -33,6 +34,16 @@ export default function SendRoam() {
   const [mode, setMode] = useState<'now' | 'find'>(params.mode === 'find' ? 'find' : 'now');
   // Find a night
   const [days] = useState(() => twoWeeks());
+  // Dots on nights you already have plans (if calendar checks are on).
+  const calBusy = useBusy(
+    mode === 'find' ? new Date(new Date(days[0].iso).getTime() - 19 * 3600_000) : null,
+    mode === 'find' ? new Date(new Date(days[13].iso).getTime() + 5 * 3600_000) : null,
+  );
+  const busyNight = (iso: string) => {
+    const start = new Date(iso).getTime() - 2 * 3600_000;
+    const end = new Date(iso).getTime() + 5 * 3600_000;
+    return (calBusy ?? []).some((e) => e.start.getTime() < end && e.end.getTime() > start);
+  };
   const [nights, setNights] = useState<Set<string>>(new Set());
   const [buzzerId, setBuzzerId] = useState<string | null>(null);
   const [idea, setIdea] = useState('');
@@ -249,7 +260,7 @@ export default function SendRoam() {
                   disabled={d.past}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: on, disabled: d.past }}
-                  accessibilityLabel={d.label}
+                  accessibilityLabel={`${d.label}${busyNight(d.iso) ? ', you have plans' : ''}`}
                   onPress={() => toggle(nights, setNights, d.iso)}
                   style={{
                     flex: 1,
@@ -263,6 +274,9 @@ export default function SendRoam() {
                     justifyContent: 'center',
                   }}>
                   <Text style={{ fontFamily: fonts.display, fontSize: 17, color: d.past ? colors.mute : colors.ink }}>{d.num}</Text>
+                  {!d.past && busyNight(d.iso) ? (
+                    <View style={{ position: 'absolute', bottom: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.violet }} />
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -297,6 +311,11 @@ export default function SendRoam() {
         ) : (
           <Body style={{ marginTop: 8 }}>Pick your nights first. The buzzer goes off before the first one.</Body>
         )}
+        {calBusy?.length ? (
+          <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft, marginTop: 8 }}>
+            <Text style={{ color: colors.violet }}>●</Text> = you already have plans that night
+          </Text>
+        ) : null}
         <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft, marginTop: 8 }}>
           Everyone votes until then. When it buzzes, the top night locks in.
         </Text>

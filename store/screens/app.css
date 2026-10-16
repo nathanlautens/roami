@@ -1,0 +1,32 @@
+/* Static stand-ins for Roami's screens, matching the app's components. */
+@font-face { font-family: 'Bricolage'; font-weight: 800; src: url('../../node_modules/@expo-google-fonts/bricolage-grotesque/800ExtraBold/BricolageGrotesque_800ExtraBold.ttf'); }
+@font-face { font-family: 'Bricolage'; font-weight: 700; src: url('../../node_modules/@expo-google-fonts/bricolage-grotesque/700Bold/BricolageGrotesque_700Bold.ttf'); }
+@font-face { font-family: 'DM Sans'; font-weight: 400; src: url('../../node_modules/@expo-google-fonts/dm-sans/400Regular/DMSans_400Regular.ttf'); }
+@font-face { font-family: 'DM Sans'; font-weight: 500; src: url('../../node_modules/@expo-google-fonts/dm-sans/500Medium/DMSans_500Medium.ttf'); }
+@font-face { font-family: 'DM Sans'; font-weight: 700; src: url('../../node_modules/@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf'); }
+
+:root { --ground:#F3EFFF; --ink:#17121F; --soft:#3D3550; --lime:#C6F432; --pink:#FF5CAD; --yellow:#FFE14D; --lilac:#B69CFF; --mute:#CFC6EA; --violet:#6B2BD9; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { width: 390px; height: 844px; overflow: hidden; background: var(--ground); color: var(--ink); font-family: 'DM Sans', sans-serif; position: relative; }
+.status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; font-weight: 700; font-size: 16px; }
+.status .dots { letter-spacing: 2px; }
+.pad { padding: 0 20px; }
+.d { font-family: 'Bricolage', sans-serif; font-weight: 800; }
+.label { font-weight: 700; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); }
+.sticker { border: 2.5px solid var(--ink); border-radius: 24px; box-shadow: 5px 5px 0 var(--ink); padding: 16px; }
+.flat { border: 2.5px solid var(--ink); border-radius: 18px; background: #fff; }
+.tag { background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 2px solid var(--ink); white-space: nowrap; }
+.av { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Bricolage'; font-weight: 800; font-size: 15px; flex: none; }
+.row { display: flex; align-items: center; gap: 10px; }
+.stack { display: flex; }
+.stack .av { width: 28px; height: 28px; font-size: 12px; margin-left: -9px; }
+.stack .av:first-child { margin-left: 0; }
+.chip { height: 36px; padding: 0 14px; border: 2px solid var(--ink); border-radius: 999px; background: #fff; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; }
+.chip.on { background: var(--ink); color: #fff; }
+.btn { height: 60px; border-radius: 18px; background: var(--ink); color: var(--lime); font-family: 'Bricolage'; font-weight: 700; font-size: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 4px 4px 0 var(--pink); }
+.nav { position: absolute; left: 16px; right: 16px; bottom: 30px; height: 76px; background: var(--ink); border-radius: 26px; display: flex; align-items: center; justify-content: space-around; }
+.nav .item { color: #fff; font-weight: 700; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 72px; }
+.nav .plus { width: 64px; height: 64px; margin-top: -34px; border-radius: 22px; background: var(--pink); border: 3px solid var(--ink); display: flex; align-items: center; justify-content: center; transform: rotate(-6deg); }
+.home-ind { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--ink); }

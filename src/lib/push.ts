@@ -44,7 +44,44 @@ export async function registerForPush(userId: string) {
     Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
 
+  // Time zone lets the server hold pushes overnight (no pings midnight–8am your time).
+  let time_zone: string | null = null;
+  try {
+    time_zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    // older devices: the server falls back to London
+  }
+
   await supabase
     .from('push_tokens')
-    .upsert({ user_id: userId, token, updated_at: new Date().toISOString() });
+    .upsert({ user_id: userId, token, time_zone, updated_at: new Date().toISOString() });
+}
+
+/**
+ * Tapping a push opens the screen it's about (each push carries a `url`, e.g.
+ * "/roam/<id>"). Covers taps while the app is open and taps that launch it.
+ * Returns a cleanup function. Does nothing in Expo Go.
+ */
+export function listenForPushTaps(open: (url: string) => void): () => void {
+  if (isRunningInExpoGo()) return () => {};
+  let cancelled = false;
+  let remove = () => {};
+
+  import('expo-notifications').then((Notifications) => {
+    if (cancelled) return;
+    const handle = (response: { notification: { request: { content: { data?: Record<string, unknown> } } } } | null) => {
+      const url = response?.notification.request.content.data?.url;
+      if (typeof url === 'string' && url.startsWith('/')) open(url);
+    };
+    Notifications.getLastNotificationResponseAsync().then((r) => {
+      if (!cancelled) handle(r);
+    });
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    remove = () => sub.remove();
+  });
+
+  return () => {
+    cancelled = true;
+    remove();
+  };
 }

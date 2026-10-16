@@ -15,6 +15,7 @@ export default function AppLayout() {
       <Stack.Screen name="circles/index" />
       <Stack.Screen name="circles/[id]" />
       <Stack.Screen name="profile" />
+      <Stack.Screen name="archive" />
       <Stack.Screen name="add/[id]" options={{ presentation: 'modal' }} />
     </Stack>
   );

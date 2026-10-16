@@ -2,6 +2,8 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Switch, Text, View } from 'react-native';
 
+import { BlockedList } from '@/components/blocked-list';
+import { CalendarSettings } from '@/components/calendar-settings';
 import { ProfileForm } from '@/components/profile-form';
 import { Body, Button, H1, Label, Screen, Sticker, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -68,7 +70,7 @@ export default function ProfileScreen() {
             const { error } = await supabase.rpc('delete_my_account');
             setDeleting(false);
             if (error) {
-              Alert.alert("Couldn't delete your account", 'Try again, or email us and we\'ll do it for you.');
+              Alert.alert("Couldn't delete your account", 'Try again, or email admin@roami.com and we\'ll do it for you.');
               return;
             }
             clearUnlockPrefs();
@@ -111,6 +113,8 @@ export default function ProfileScreen() {
             </Sticker>
           ) : null}
 
+          <CalendarSettings />
+          <BlockedList />
           <Button variant="dashed" label="Log out" onPress={logOut} />
           <Button variant="link" label={deleting ? 'Deleting…' : 'Delete my account'} onPress={deleteAccount} />
         </View>

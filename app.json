@@ -28,7 +28,11 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -53,6 +57,12 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Roami uses Face ID so you can get in without another email code."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Roami adds Roams you're in on to your calendar and shows what's already on when you're picking a night."
         }
       ]
     ],

@@ -12,6 +12,7 @@ import { TestTools } from '@/components/test-tools';
 import { UnlockPrompt } from '@/components/unlock-prompt';
 import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { syncCalendar } from '@/lib/calendar';
 import { SKIP_LOGIN } from '@/lib/config';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
 import { markBuzzerSeen, resolveDue, seenBuzzers, useOpenRoams, useTick } from '@/lib/open-roams';
@@ -40,6 +41,11 @@ export default function Feed() {
     });
   }, [opens, tick, reload, reloadOpens]);
 
+  // Keep the phone calendar in step with your Roams.
+  useEffect(() => {
+    if (!loading) syncCalendar(me);
+  }, [items, loading, me]);
+
   const buzzing = opens
     .filter((o) => o.status === 'open' && new Date(o.buzzer_at).getTime() > tick)
     .sort((a, b) => a.buzzer_at.localeCompare(b.buzzer_at));
@@ -55,23 +61,23 @@ export default function Feed() {
     const grabs: FeedItem[] = [];
     const mine: FeedItem[] = [];
     const going: FeedItem[] = [];
-    const recent: FeedItem[] = [];
+    const passed: FeedItem[] = [];
     for (const it of items) {
       const { roam, mine: inv } = it;
       const response = effectiveResponse(inv, roam);
-      if (!isActive(roam)) recent.push(it);
-      else if (roam.host_id === me) mine.push(it);
+      if (!isActive(roam)) continue; // over or called off: lives in the Archive
+      if (roam.host_id === me) mine.push(it);
       else if (roam.status === 'up_for_grabs' && response === 'in') grabs.push(it);
       else if (response === null || response === 'maybe') waiting.push(it);
       else if (response === 'in') going.push(it);
-      else recent.push(it); // said Can't
+      else passed.push(it); // said Can't (you can still change your mind)
     }
     return {
       waiting: waiting.sort(byStart),
       grabs: grabs.sort(byStart),
       mine: mine.sort(byStart),
       going: going.sort(byStart),
-      recent: recent.sort((a, b) => b.roam.starts_at.localeCompare(a.roam.starts_at)),
+      passed: passed.sort(byStart),
     };
   }, [items, me]);
 
@@ -148,7 +154,16 @@ export default function Feed() {
         <Section dot={colors.yellow} title="Up for grabs" items={sections.grabs} me={me} variant="grabs" />
         <Section dot={colors.lime} title="Your Roams" items={sections.mine} me={me} variant="mine" />
         <Section dot={colors.pink} title="Waiting on you" items={sections.waiting} me={me} variant="hot" />
-        <Section dot={colors.mute} title="Recently" items={sections.recent} me={me} variant="quiet" />
+        <Section dot={colors.mute} title="You passed" items={sections.passed} me={me} variant="quiet" />
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/archive')}
+          style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, marginTop: 8 }}>
+          <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: colors.inkSoft, textDecorationLine: 'underline' }}>
+            See past Roams
+          </Text>
+        </Pressable>
 
         {empty && !noFriends ? (
           <View style={{ paddingVertical: 32, gap: 8 }}>

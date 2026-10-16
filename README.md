@@ -50,7 +50,7 @@ npm start
 ```
 Scan the QR code with the **Expo Go** app (iOS) or the camera.
 
-Push notifications and some native features need a **development build** instead of Expo Go, especially on Android:
+Push notifications and calendar sync need a **development build** (or the TestFlight / Play build) instead of Expo Go:
 ```bash
 npx eas-cli@latest build --profile development --platform ios     # or android
 ```
@@ -59,14 +59,17 @@ npx eas-cli@latest build --profile development --platform ios     # or android
 
 | Path | What it is |
 | --- | --- |
-| `src/app/(auth)` | Welcome + phone number / SMS code login |
+| `src/app/(auth)` | Welcome + email code login (then Face ID / fingerprint) |
 | `src/app/(onboarding)/setup.tsx` | Display name + profile photo |
-| `src/app/(app)/index.tsx` | The feed: waiting on you, up for grabs, your Roams |
-| `src/app/(app)/send.tsx` | Send a Roam: crews, what, vibe, when, where, spots |
-| `src/app/(app)/roam/[id].tsx` | One Roam: respond, double-booked check, bring someone, can't make it, take the wheel |
-| `src/app/(app)/friends.tsx` | Find friends from contacts, requests, invite link |
-| `src/app/(app)/crews` | Private crews with "last roamed" |
-| `src/lib` | Supabase client, auth, data hooks, Roam rules |
+| `src/app/(app)/index.tsx` | The feed: buzzing, you're in, up for grabs, your Roams, waiting on you |
+| `src/app/(app)/archive.tsx` | Past Roams, by month |
+| `src/app/(app)/open/[id].tsx` | Open Roams: vote on nights and vibes before the buzzer |
+| `src/app/(app)/send.tsx` | Send a Roam: circles, what, vibe, when, where, spots (or find a night) |
+| `src/app/(app)/roam/[id].tsx` | One Roam: respond, calendar check, bring someone, can't make it, take the wheel, report / block |
+| `src/app/(app)/friends.tsx` | Friend codes, requests, invite link, block |
+| `src/app/(app)/circles` | Private circles with "last roamed" |
+| `src/lib` | Supabase client, auth, data hooks, Roam rules, calendar sync, push |
+| `store/` | Store screenshots (`npm run screenshots`) |
 | `supabase/migrations` | The database schema |
 | `supabase/tests` | Tests for the schema's rules (`npm run test:db`) |
 
@@ -87,4 +90,5 @@ npm run test:sms-hook
 npm run test:mock
 npm run test:open
 npm run test:release
+npm run test:push
 ```
