@@ -10,14 +10,13 @@ import { Avatar, Button, Field, Label, Sticker } from './ui';
 
 /** Photo + display name. Used in onboarding and on the profile screen. */
 export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => void }) {
-  const { userId, profile, refreshProfile, session } = useAuth();
+  const { userId, profile, refreshProfile } = useAuth();
   const [name, setName] = useState(profile?.display_name ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const preview = { id: userId ?? 'me', display_name: name || '?', avatar_url: avatarUrl };
-  const phone = session?.user.phone ? `+${session.user.phone.replace(/^\+/, '')}` : null;
 
   async function pickPhoto() {
     if (!userId) return;
@@ -110,11 +109,9 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
           returnKeyType="done"
         />
       </View>
-      {phone ? (
-        <Text style={{ fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft, marginTop: 10 }}>
-          Linked to {phone}. Friends who have your number will find you.
-        </Text>
-      ) : null}
+      <Text style={{ fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft, marginTop: 10 }}>
+        This is how friends see you. Share your friend code so they can add you.
+      </Text>
 
       <Sticker shadow={null} style={{ marginTop: 24 }} innerStyle={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Avatar profile={preview} size={44} />

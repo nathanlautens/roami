@@ -9,8 +9,10 @@ import { OpenRoamCard } from '@/components/open-roam-card';
 import { RoamCard } from '@/components/roam-card';
 import { SentCelebration } from '@/components/sent-celebration';
 import { TestTools } from '@/components/test-tools';
+import { UnlockPrompt } from '@/components/unlock-prompt';
 import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { SKIP_LOGIN } from '@/lib/config';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
 import { markBuzzerSeen, resolveDue, seenBuzzers, useOpenRoams, useTick } from '@/lib/open-roams';
 import { effectiveResponse, isActive } from '@/lib/roams';
@@ -158,6 +160,7 @@ export default function Feed() {
 
       <NavBar />
       <SentCelebration />
+      {!SKIP_LOGIN ? <UnlockPrompt /> : null}
       {justBuzzed ? (
         <BuzzerResult
           key={justBuzzed.id}

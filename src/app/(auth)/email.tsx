@@ -3,16 +3,21 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 
 import { Body, Button, Field, H1, Label, Progress, Screen, Sticker, TopBar } from '@/components/ui';
-import { prettyPhone, toE164 } from '@/lib/phone';
+import { REVIEW_EMAIL } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 
-export default function PhoneLogin() {
-  const [number, setNumber] = useState('');
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Sign up or log in with an email code. After this, Face ID / fingerprint unlocks the app. */
+export default function EmailLogin() {
+  const [email, setEmail] = useState('');
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  const [password, setPassword] = useState('');
+  const isReviewer = email.trim().toLowerCase() === REVIEW_EMAIL;
   const codeRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -21,20 +26,31 @@ export default function PhoneLogin() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
+  async function reviewerLogin() {
+    setBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: REVIEW_EMAIL, password });
+    setBusy(false);
+    if (error) Alert.alert('Not quite', 'Wrong password.');
+  }
+
   async function sendCode() {
-    const phone = toE164(number);
-    if (!phone) {
-      Alert.alert('Hmm', "That doesn't look like a phone number.");
+    const clean = email.trim().toLowerCase();
+    if (clean === REVIEW_EMAIL) return reviewerLogin();
+    if (!EMAIL_RE.test(clean)) {
+      Alert.alert('Hmm', "That doesn't look like an email.");
       return;
     }
     setBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({ phone });
+    const { error } = await supabase.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: true } });
     setBusy(false);
     if (error) {
-      Alert.alert("Couldn't send your code", error.message);
+      Alert.alert(
+        "Couldn't send your code",
+        error.message.toLowerCase().includes('rate') ? 'Too many tries. Give it a minute and try again.' : error.message,
+      );
       return;
     }
-    setSentTo(phone);
+    setSentTo(clean);
     setCode('');
     setResendIn(60);
     setTimeout(() => codeRef.current?.focus(), 300);
@@ -43,10 +59,10 @@ export default function PhoneLogin() {
   async function verify(token = code) {
     if (!sentTo || token.length !== 6) return;
     setBusy(true);
-    const { error } = await supabase.auth.verifyOtp({ phone: sentTo, token, type: 'sms' });
+    const { error } = await supabase.auth.verifyOtp({ email: sentTo, token, type: 'email' });
     setBusy(false);
     if (error) {
-      Alert.alert('Not quite', "That code didn't work. Check your texts and try again.");
+      Alert.alert('Not quite', "That code didn't work. Check your email and try again.");
       setCode('');
     }
     // On success the auth guard moves you on automatically.
@@ -59,41 +75,61 @@ export default function PhoneLogin() {
       <Screen
         footer={
           sentTo ? (
-            <Button label="Verify me" onPress={() => verify()} loading={busy} disabled={code.length !== 6} />
+            <Button label="Let me in" onPress={() => verify()} loading={busy} disabled={code.length !== 6} />
+          ) : isReviewer ? (
+            <Button label="Sign in" onPress={reviewerLogin} loading={busy} disabled={!password} />
           ) : (
-            <Button label="Text me a code" onPress={sendCode} loading={busy} disabled={!number.trim()} />
+            <Button label="Email me a code" onPress={sendCode} loading={busy} disabled={!email.trim()} />
           )
         }>
         <TopBar onBack={() => router.back()} right={<Progress step={0} of={3} />} />
-        <H1 style={{ marginTop: 28, marginBottom: 10 }}>What's your number?</H1>
-        <Body style={{ marginBottom: 24 }}>So your friends can find you. We'll never call. We're not like that.</Body>
+        <H1 style={{ marginTop: 28, marginBottom: 10 }}>What's your email?</H1>
+        <Body style={{ marginBottom: 24 }}>
+          Just this once. After today it's Face ID or fingerprint. We'll never spam you. Pinky promise.
+        </Body>
 
-        <Label>Mobile number</Label>
+        <Label>Email</Label>
         <View style={{ marginTop: 8 }}>
           <Field
-            value={number}
+            value={email}
             onChangeText={(t) => {
-              setNumber(t);
+              setEmail(t);
               if (sentTo) setSentTo(null);
             }}
-            placeholder="07700 900123"
-            keyboardType="phone-pad"
-            textContentType="telephoneNumber"
-            autoComplete="tel"
-            accessibilityLabel="Mobile number"
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="Email"
             returnKeyType="done"
             onSubmitEditing={sendCode}
           />
         </View>
-        <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft, marginTop: 8 }}>
-          UK numbers work as-is. Abroad? Start with + and your country code.
-        </Text>
+
+        {isReviewer ? (
+          <View style={{ marginTop: 20 }}>
+            <Label>Password</Label>
+            <View style={{ marginTop: 8 }}>
+              <Field
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                accessibilityLabel="Password"
+                returnKeyType="done"
+                onSubmitEditing={reviewerLogin}
+              />
+            </View>
+          </View>
+        ) : null}
 
         {sentTo ? (
           <Sticker shadow={null} style={{ marginTop: 28 }} innerStyle={{ padding: 18 }}>
-            <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>Code sent. Check your texts</Text>
+            <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>Code sent. Check your inbox</Text>
             <Text style={{ fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft, marginTop: 2 }}>
-              6 digits, sent to {prettyPhone(sentTo)}
+              6 digits, sent to {sentTo}. Peek in spam if it's shy.
             </Text>
 
             <Pressable
@@ -121,7 +157,7 @@ export default function PhoneLogin() {
                 );
               })}
             </Pressable>
-            {/* One real input behind the six boxes, so SMS autofill works. */}
+            {/* One real input behind the six boxes, so autofill from Mail works. */}
             <TextInput
               ref={codeRef}
               value={code}
@@ -132,7 +168,7 @@ export default function PhoneLogin() {
               }}
               keyboardType="number-pad"
               textContentType="oneTimeCode"
-              autoComplete="sms-otp"
+              autoComplete="one-time-code"
               maxLength={6}
               style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
               accessibilityLabel="Verification code"

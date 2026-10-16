@@ -1,4 +1,3 @@
-import { Contact, ContactField, requestPermissionsAsync } from 'expo-contacts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, Share, Text, TextInput, View } from 'react-native';
@@ -7,9 +6,7 @@ import { ShareIcon } from '@/components/icons';
 import { TestTools } from '@/components/test-tools';
 import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { SKIP_LOGIN } from '@/lib/config';
 import { useFriends } from '@/lib/data';
-import { toE164 } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -18,38 +15,8 @@ export default function Friends() {
   const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
   const { userId } = useAuth();
   const { data, reload } = useFriends();
-  const [matches, setMatches] = useState<Profile[] | null>(null);
-  const [checking, setChecking] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const friendIds = new Set(data.friends.map((f) => f.id));
-  const outgoingIds = new Set(data.outgoing.map((f) => f.id));
-
-  async function checkContacts() {
-    setChecking(true);
-    try {
-      const { status } = await requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('No worries', 'Share your invite link instead and friends can add you.');
-        return;
-      }
-      const all = await Contact.getAllDetails([ContactField.PHONES]);
-      const phones = new Set<string>();
-      for (const c of all) {
-        for (const p of c.phones ?? []) {
-          const e = p.number ? toE164(p.number) : null;
-          if (e) phones.add(e);
-        }
-      }
-      const { data: found, error } = await supabase.rpc('match_contacts', { p_phones: [...phones].slice(0, 2000) });
-      if (error) throw error;
-      setMatches((found ?? []) as Profile[]);
-    } catch {
-      Alert.alert("Couldn't check contacts", 'Try again in a sec?');
-    } finally {
-      setChecking(false);
-    }
-  }
 
   async function add(id: string) {
     setBusyId(id);
@@ -171,27 +138,7 @@ export default function Friends() {
         </View>
       ) : null}
 
-      {SKIP_LOGIN ? null : <Label>Already on Roami</Label>}
-      <View style={{ gap: 8, marginTop: 10 }}>
-        {SKIP_LOGIN ? null : matches === null ? (
-          <Button variant="dashed" label={checking ? 'Checking…' : 'Check my contacts'} onPress={checkContacts} />
-        ) : matches.length === 0 ? (
-          <Body>None of your contacts are here yet. Send them the link!</Body>
-        ) : (
-          matches.map((p) => (
-            <Row key={p.id} profile={p}>
-              {friendIds.has(p.id) ? (
-                <Tag label="Friends" color={colors.lime} dark />
-              ) : outgoingIds.has(p.id) ? (
-                <Tag label="Requested" />
-              ) : (
-                <SmallButton label="Add" primary busy={busyId === p.id} onPress={() => add(p.id)} />
-              )}
-            </Row>
-          ))
-        )}
-        <Button variant="dashed" icon={<ShareIcon size={18} />} label="Invite someone who's not here yet" onPress={shareLink} />
-      </View>
+      <Button variant="dashed" icon={<ShareIcon size={18} />} label="Invite someone who's not here yet" onPress={shareLink} />
 
       {data.friends.length ? (
         <View style={{ marginTop: 28 }}>

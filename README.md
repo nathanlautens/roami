@@ -12,8 +12,13 @@ In the [Supabase dashboard](https://supabase.com/dashboard/project/iounsooetwcgf
 
 This creates the tables, the privacy rules (row level security), the functions the app calls, live updates, and the `avatars` photo bucket.
 
-### 2. Testing mode: no login (current setting)
-`src/lib/config.ts` has `SKIP_LOGIN = true`. Each phone is signed in anonymously in the background, then asked for a name and photo. Nothing else changes: privacy rules and data work exactly as with phone login.
+**Releasing to the App Store and Google Play: see [RELEASE.md](RELEASE.md).**
+
+### 2. Login
+Release builds use an **email code once, then Face ID / fingerprint** (see RELEASE.md for the Supabase email setup).
+
+### 2-old. Testing mode: no login (off by default)
+Set `SKIP_LOGIN = true` in `src/lib/config.ts` to skip login. Each phone is signed in anonymously in the background, then asked for a name and photo. Nothing else changes: privacy rules and data work exactly as with phone login.
 
 One switch in Supabase: **Authentication → Sign In / Providers → Allow anonymous sign-ins → on → Save**.
 
@@ -81,4 +86,5 @@ npm run test:db
 npm run test:sms-hook
 npm run test:mock
 npm run test:open
+npm run test:release
 ```

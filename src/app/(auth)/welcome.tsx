@@ -66,8 +66,8 @@ export default function Welcome() {
             </>
           ) : (
             <>
-              <Button label="Let's roam" onPress={() => router.push('/phone')} />
-              <Button variant="link" label="Already roaming? Log in" onPress={() => router.push('/phone')} />
+              <Button label="Let's roam" onPress={() => router.push('/email')} />
+              <Button variant="link" label="Already roaming? Log in" onPress={() => router.push('/email')} />
             </>
           )}
         </View>

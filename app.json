@@ -7,10 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "roami",
     "userInterfaceStyle": "light",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "backgroundColor": "#F3EFFF",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.nathanlautens.roami",
       "supportsTablet": false,
       "infoPlist": {
@@ -34,16 +37,10 @@
         {
           "backgroundColor": "#F3EFFF",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 220
         }
       ],
       "expo-sqlite",
-      [
-        "expo-contacts",
-        {
-          "contactsPermission": "Roami checks your contacts so you can find friends who are already roaming. Nothing is uploaded except phone numbers to match."
-        }
-      ],
       [
         "expo-image-picker",
         {
@@ -51,7 +48,13 @@
           "cameraPermission": "Snap a profile pic so your friends know it's you."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Roami uses Face ID so you can get in without another email code."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
