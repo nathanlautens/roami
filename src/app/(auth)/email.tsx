@@ -19,6 +19,7 @@ export default function EmailLogin() {
   const [password, setPassword] = useState('');
   const isReviewer = email.trim().toLowerCase() === REVIEW_EMAIL;
   const codeRef = useRef<TextInput>(null);
+  const verifying = useRef(false);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -57,9 +58,12 @@ export default function EmailLogin() {
   }
 
   async function verify(token = code) {
-    if (!sentTo || token.length !== 6) return;
+    // Autofill and the button can both fire; only check the code once.
+    if (!sentTo || token.length !== 6 || verifying.current) return;
+    verifying.current = true;
     setBusy(true);
     const { error } = await supabase.auth.verifyOtp({ email: sentTo, token, type: 'email' });
+    verifying.current = false;
     setBusy(false);
     if (error) {
       Alert.alert('Not quite', "That code didn't work. Check your email and try again.");

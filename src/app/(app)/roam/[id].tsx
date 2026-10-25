@@ -97,9 +97,12 @@ export default function RoamScreen() {
     run(response, () => supabase.rpc('respond_to_roam', { p_roam: roamId, p_response: response, p_note: noteValue || null }));
 
   async function answer(response: Response) {
+    if (busy) return; // one answer at a time
     Haptics.selectionAsync().catch(() => {});
     if (response === 'in' && myResponse !== 'in') {
+      setBusy(response);
       const found = await findClashes(me, roam!);
+      setBusy(null);
       if (found.length) {
         setClashes(found);
         setSkip(found[0].id);
@@ -162,6 +165,7 @@ export default function RoamScreen() {
         : 'Nobody was in yet, so it quietly disappears.',
     );
     reload();
+    syncCalendar(me); // you're out, so it comes off your calendar
   }
 
   async function bring(friendId: string) {
@@ -350,7 +354,8 @@ export default function RoamScreen() {
             <TextInput
               value={noteValue}
               onChangeText={setNote}
-              onEndEditing={() => myResponse && note !== null && respond(myResponse)}
+              // Saves the note with your actual answer (not an expired Maybe shown as Can't).
+              onEndEditing={() => mine?.response && note !== null && note !== (mine.note ?? '') && respond(mine.response)}
               placeholder="Add a note… (optional)"
               placeholderTextColor="#8B82A3"
               maxLength={80}

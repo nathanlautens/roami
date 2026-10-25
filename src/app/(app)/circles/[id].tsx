@@ -30,7 +30,8 @@ export default function CircleEditor() {
 function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; onboarding: boolean }) {
   const isNew = !circle;
   const existing = circle;
-  const { data: friends } = useFriends();
+  const { data: friends, loading, error: friendsError } = useFriends();
+  const friendsLoading = loading || !!friendsError;
   const [name, setName] = useState(circle?.name ?? '');
   const [picked, setPicked] = useState<Set<string>>(() => new Set(circle?.members.map((m) => m.id) ?? []));
   const [saving, setSaving] = useState(false);
@@ -46,9 +47,14 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
 
   async function save() {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed || friendsLoading) return; // wait for your friends list, or everyone would look removed
     setSaving(true);
     try {
+      // Only current friends can be in a circle (someone you've since unfriended is dropped).
+      const friendIds = new Set(friends.friends.map((f) => f.id));
+      const want = [...picked].filter((fid) => friendIds.has(fid));
+      const had = new Set(circle?.members.map((m) => m.id) ?? []);
+
       let circleId = id;
       if (isNew) {
         const { data, error } = await supabase.from('crews').insert({ name: trimmed }).select('id').single();
@@ -57,12 +63,18 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
       } else {
         const { error } = await supabase.from('crews').update({ name: trimmed }).eq('id', id);
         if (error) throw error;
-        await supabase.from('crew_members').delete().eq('crew_id', id);
       }
-      if (picked.size) {
+      // Change only who was added or removed, so a failed save can't empty the circle.
+      const added = want.filter((fid) => !had.has(fid));
+      const removed = [...had].filter((fid) => !want.includes(fid));
+      if (added.length) {
         const { error } = await supabase
           .from('crew_members')
-          .insert([...picked].map((member_id) => ({ crew_id: circleId, member_id })));
+          .upsert(added.map((member_id) => ({ crew_id: circleId, member_id })), { ignoreDuplicates: true });
+        if (error) throw error;
+      }
+      if (removed.length) {
+        const { error } = await supabase.from('crew_members').delete().eq('crew_id', circleId).in('member_id', removed);
         if (error) throw error;
       }
       if (onboarding) router.replace('/');
@@ -89,7 +101,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
   }
 
   return (
-    <Screen footer={<Button label={isNew ? 'Make it official' : 'Save circle'} onPress={save} loading={saving} disabled={!name.trim()} />}>
+    <Screen footer={<Button label={isNew ? 'Make it official' : 'Save circle'} onPress={save} loading={saving} disabled={!name.trim() || friendsLoading} />}>
       <TopBar
         onBack={onboarding ? undefined : () => router.back()}
         right={

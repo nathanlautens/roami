@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
-import { pickAndUploadAvatar } from '@/lib/avatar';
+import { pickAndUploadAvatar, removeOldPhotos } from '@/lib/avatar';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts } from '@/lib/theme';
 import { CameraIcon, PlusIcon } from './icons';
@@ -46,6 +46,7 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
       return;
     }
     await refreshProfile();
+    removeOldPhotos(userId, avatarUrl).catch(() => {});
     onSaved?.();
   }
 

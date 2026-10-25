@@ -127,14 +127,44 @@ type InviteRow = {
 };
 
 let syncing: Promise<void> | null = null;
+let again = false;
 
-/** Adds, updates and removes calendar events to match your Roams. Safe to call often. */
-export function syncCalendar(userId: string) {
+/**
+ * Adds, updates and removes calendar events to match your Roams. Safe to call
+ * often: if a sync is already running, one more runs straight after it, so a
+ * change made mid-sync (you just tapped In) is never missed.
+ */
+export function syncCalendar(userId: string): Promise<void> {
   if (!calendarAvailable || !calendarPrefs().sync) return Promise.resolve();
-  syncing ??= doSync(userId).finally(() => {
+  if (syncing) {
+    again = true;
+    return syncing;
+  }
+  syncing = (async () => {
+    do {
+      again = false;
+      try {
+        await doSync(userId);
+      } catch {
+        // best effort; the next change tries again
+      }
+    } while (again);
+  })().finally(() => {
     syncing = null;
   });
   return syncing;
+}
+
+async function calendarFor(C: CalendarModule, preferred: string) {
+  try {
+    return await C.ExpoCalendar.get(preferred);
+  } catch {
+    // The chosen calendar was deleted or hidden: use the phone's default instead.
+    const fallback = await defaultCalendarId();
+    if (!fallback || fallback === preferred) throw new Error('no_calendar');
+    setCalendarPrefs({ calendarId: fallback });
+    return C.ExpoCalendar.get(fallback);
+  }
 }
 
 async function doSync(userId: string) {
@@ -162,8 +192,9 @@ async function doSync(userId: string) {
     rows.set(r.roam_id, r);
   }
 
+  // The host is always In, until they say they can't make it (then their answer is Can't).
   const shouldBeIn = (r: InviteRow) =>
-    !!r.roam && r.roam.status !== 'cancelled' && new Date(r.roam.ends_at) > new Date() && (r.roam.host_id === userId || r.response === 'in');
+    !!r.roam && r.roam.status !== 'cancelled' && new Date(r.roam.ends_at) > new Date() && r.response === 'in';
 
   // Add or update
   for (const r of rows.values()) {
@@ -179,9 +210,12 @@ async function doSync(userId: string) {
     };
     try {
       if (!existing) {
-        const calendar = await C.ExpoCalendar.get(calendarId);
+        const calendar = await calendarFor(C, calendarId);
         const event = await calendar.createEvent({ ...details, alarms: [{ relativeOffset: -60 }] });
         linked[roam.id] = { eventId: event.id, starts: roam.starts_at, ends: roam.ends_at, what: roam.what, location: roam.location };
+        // Saved straight away, so an app closed mid-sync can't leave a duplicate behind.
+        saveLinks(linked);
+        continue;
       } else if (
         existing.eventId &&
         (existing.starts !== roam.starts_at || existing.ends !== roam.ends_at || existing.what !== roam.what || existing.location !== roam.location)
@@ -195,6 +229,7 @@ async function doSync(userId: string) {
       if (existing) linked[roam.id] = { ...existing, eventId: '' };
     }
   }
+  saveLinks(linked);
 
   // Remove: you said Can't, it was called off, or you're no longer on it.
   for (const roamId of linkedIds) {

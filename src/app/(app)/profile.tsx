@@ -15,6 +15,7 @@ import {
   unlockKind,
   unlockLabel,
 } from '@/lib/biometric';
+import { removeAllRoamiEvents, setCalendarPrefs } from '@/lib/calendar';
 import { SKIP_LOGIN } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
 import { colors, fonts } from '@/lib/theme';
@@ -74,6 +75,9 @@ export default function ProfileScreen() {
               return;
             }
             clearUnlockPrefs();
+            // Take the Roams Roami added off your calendar, since they no longer exist.
+            await removeAllRoamiEvents().catch(() => {});
+            setCalendarPrefs({ sync: false, showPlans: false });
             await supabase.auth.signOut();
           },
         },

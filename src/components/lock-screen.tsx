@@ -3,16 +3,18 @@ import { Alert, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { authenticate, clearUnlockPrefs, unlockKind, unlockLabel } from '@/lib/biometric';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth';
 import { colors, fonts } from '@/lib/theme';
 import { Body, Button, Sticker } from './ui';
 
 /** Shown over the app until you pass Face ID / fingerprint / passcode. */
 export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
+  const { signOut } = useAuth();
   const [label, setLabel] = useState('Face ID');
   const [trying, setTrying] = useState(false);
 
   async function tryUnlock() {
+    if (trying) return;
     setTrying(true);
     const ok = await authenticate('Unlock Roami');
     setTrying(false);
@@ -38,7 +40,9 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
         text: 'Use email',
         onPress: async () => {
           clearUnlockPrefs();
-          await supabase.auth.signOut();
+          await signOut();
+          // Then clear the lock, so turning Face ID back on later doesn't lock you out straight away.
+          onUnlocked();
         },
       },
     ]);

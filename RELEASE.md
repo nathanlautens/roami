@@ -26,6 +26,7 @@ Do the steps in order. Anything marked ⏳ involves waiting on Apple or Google, 
 1. **Database → Extensions**: enable **pg_cron** and **pg_net**. pg_cron runs the buzzer and push jobs every minute; pg_net lets the database send pushes.
 2. **SQL Editor → New query**: paste all of `supabase/migrations/20261016210000_release_ready.sql` and **Run**.
 3. New query again: paste all of `supabase/migrations/20261016220000_safety_and_push.sql` and **Run**.
+4. New query again: paste all of `supabase/migrations/20261025000000_bug_fixes.sql` and **Run** (fixes from the October code review; safe to run more than once).
 
 The first file adds "Delete my account", the every-minute buzzer, and locks the test helpers so real users can't create fake friends.
 To use test friends again while testing, run the `grant …` line at the bottom of that file.

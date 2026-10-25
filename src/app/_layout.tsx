@@ -7,13 +7,14 @@ import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LockScreen } from '@/components/lock-screen';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { isUnlockEnabled } from '@/lib/biometric';
+import { setAppLocked } from '@/lib/lock';
 import { listenForPushTaps } from '@/lib/push';
 import { colors } from '@/lib/theme';
 
@@ -37,8 +38,7 @@ function Routes() {
   const canOpenLinks = ready && !!session && !needsProfile;
   useEffect(() => {
     if (!canOpenLinks) return;
-     
-    return listenForPushTaps((url) => router.push(url as any));
+    return listenForPushTaps((url) => router.push(url as never));
   }, [canOpenLinks]);
 
   useEffect(() => {
@@ -52,22 +52,34 @@ function Routes() {
     return () => sub.remove();
   }, []);
 
+  const showLock = ready && !!session && locked && isUnlockEnabled();
+  useEffect(() => {
+    setAppLocked(showLock);
+  }, [showLock]);
+
   // Don't evaluate the guards until we know whether someone's signed in.
   if (!ready) return null;
-  if (session && locked && isUnlockEnabled()) return <LockScreen onUnlocked={unlock} />;
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
-      <Stack.Protected guard={!session}>
-        <Stack.Screen name="(auth)" />
-      </Stack.Protected>
-      <Stack.Protected guard={!!session && needsProfile}>
-        <Stack.Screen name="(onboarding)" />
-      </Stack.Protected>
-      <Stack.Protected guard={!!session && !needsProfile}>
-        <Stack.Screen name="(app)" />
-      </Stack.Protected>
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
+        <Stack.Protected guard={!session}>
+          <Stack.Screen name="(auth)" />
+        </Stack.Protected>
+        <Stack.Protected guard={!!session && needsProfile}>
+          <Stack.Screen name="(onboarding)" />
+        </Stack.Protected>
+        <Stack.Protected guard={!!session && !needsProfile}>
+          <Stack.Screen name="(app)" />
+        </Stack.Protected>
+      </Stack>
+      {/* A cover, not a replacement: whatever you were doing is still there after unlocking. */}
+      {showLock ? (
+        <View style={StyleSheet.absoluteFill}>
+          <LockScreen onUnlocked={unlock} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 

@@ -69,13 +69,19 @@ export function listenForPushTaps(open: (url: string) => void): () => void {
 
   import('expo-notifications').then((Notifications) => {
     if (cancelled) return;
-    const handle = (response: { notification: { request: { content: { data?: Record<string, unknown> } } } } | null) => {
-      const url = response?.notification.request.content.data?.url;
+    type Tap = { notification: { request: { identifier: string; content: { data?: Record<string, unknown> } } } } | null;
+    const handle = (response: Tap) => {
+      if (!response) return;
+      // Each tap opens its screen once, even if the app restarts or this listener is set up again.
+      const id = response.notification.request.identifier;
+      if (id && readHandled() === id) return;
+      writeHandled(id);
+      const url = response.notification.request.content.data?.url;
       if (typeof url === 'string' && url.startsWith('/')) open(url);
     };
-    Notifications.getLastNotificationResponseAsync().then((r) => {
-      if (!cancelled) handle(r);
-    });
+    // The tap that launched the app (if any), then later taps.
+    handle(Notifications.getLastNotificationResponse());
+    Notifications.clearLastNotificationResponse();
     const sub = Notifications.addNotificationResponseReceivedListener(handle);
     remove = () => sub.remove();
   });
@@ -84,4 +90,20 @@ export function listenForPushTaps(open: (url: string) => void): () => void {
     cancelled = true;
     remove();
   };
+}
+
+const HANDLED_KEY = 'roami.lastPushTap';
+function readHandled() {
+  try {
+    return localStorage.getItem(HANDLED_KEY);
+  } catch {
+    return null;
+  }
+}
+function writeHandled(id: string) {
+  try {
+    localStorage.setItem(HANDLED_KEY, id);
+  } catch {
+    // best effort
+  }
 }

@@ -114,8 +114,10 @@ export function standings(o: OpenRoam): Standings {
   }
 
   const enthusiasm = (night: string) => (freeBy.get(night) ?? []).reduce((n, u) => n + (vibesPerUser.get(u) ?? 0), 0);
+  // Like the buzzer, skip nights that are already over (started more than 5 hours ago).
+  const now = Date.now();
   const leadNight =
-    [...o.nights].sort(
+    [...o.nights].filter((n) => new Date(n).getTime() + 5 * 3600_000 > now).sort(
       (a, b) =>
         (freeBy.get(b)?.length ?? 0) - (freeBy.get(a)?.length ?? 0) || enthusiasm(b) - enthusiasm(a) || a.localeCompare(b),
     )[0] ?? null;

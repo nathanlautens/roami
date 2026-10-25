@@ -8,6 +8,7 @@ import { TestTools } from '@/components/test-tools';
 import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useFriends } from '@/lib/data';
+import { friendlyError } from '@/lib/roams';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -24,7 +25,7 @@ export default function Friends() {
     setBusyId(id);
     const { error } = await supabase.rpc('add_friend', { p_target: id });
     setBusyId(null);
-    if (error) Alert.alert('Hmm', 'Something went sideways. Try again?');
+    if (error) Alert.alert('Hmm', friendlyError(error));
     reload();
   }
 
@@ -70,7 +71,7 @@ export default function Friends() {
     const { data: status, error } = await supabase.rpc('add_friend', { p_target: found[0].id });
     setAdding(false);
     if (error) {
-      Alert.alert('Hmm', 'Something went sideways. Try again?');
+      Alert.alert('Hmm', friendlyError(error));
       return;
     }
     setCode('');

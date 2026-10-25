@@ -27,3 +27,10 @@ export async function pickAndUploadAvatar(userId: string): Promise<string | null
 
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
+
+/** Deletes your earlier photos once a new one is saved (each upload is a new file). */
+export async function removeOldPhotos(userId: string, keepUrl: string | null) {
+  const { data: files } = await supabase.storage.from('avatars').list(userId);
+  const old = (files ?? []).map((f) => `${userId}/${f.name}`).filter((path) => !keepUrl?.endsWith(path));
+  if (old.length) await supabase.storage.from('avatars').remove(old);
+}

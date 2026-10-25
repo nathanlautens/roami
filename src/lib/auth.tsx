@@ -94,6 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     refreshProfile: () => loadProfile(userId),
     signOut: async () => {
+      // Stop this phone getting pushes for this account (must happen while still signed in).
+      if (userId) await supabase.from('push_tokens').delete().eq('user_id', userId);
       await supabase.auth.signOut();
     },
   };

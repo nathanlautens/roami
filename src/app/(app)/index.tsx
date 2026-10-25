@@ -14,6 +14,7 @@ import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { syncCalendar } from '@/lib/calendar';
 import { SKIP_LOGIN } from '@/lib/config';
+import { useAppLocked } from '@/lib/lock';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
 import { markBuzzerSeen, resolveDue, seenBuzzers, useOpenRoams, useTick } from '@/lib/open-roams';
 import { effectiveResponse, isActive } from '@/lib/roams';
@@ -30,6 +31,7 @@ export default function Feed() {
   const { data: opens, reload: reloadOpens } = useOpenRoams();
   const tick = useTick(15_000);
   const [seen, setSeen] = useState(() => seenBuzzers());
+  const locked = useAppLocked();
 
   // The buzzer: when one goes off, lock in the winner, then show the result.
   useEffect(() => {
@@ -67,8 +69,10 @@ export default function Feed() {
       const response = effectiveResponse(inv, roam);
       if (!isActive(roam)) continue; // over or called off: lives in the Archive
       if (roam.host_id === me) mine.push(it);
-      else if (roam.status === 'up_for_grabs' && response === 'in') grabs.push(it);
-      else if (response === null || response === 'maybe') waiting.push(it);
+      else if (roam.status === 'up_for_grabs') {
+        // Only people who are In can take it over; for everyone else it's on hold.
+        if (response === 'in') grabs.push(it);
+      } else if (response === null || response === 'maybe') waiting.push(it);
       else if (response === 'in') going.push(it);
       else passed.push(it); // said Can't (you can still change your mind)
     }
@@ -176,7 +180,7 @@ export default function Feed() {
       <NavBar />
       <SentCelebration />
       {!SKIP_LOGIN ? <UnlockPrompt /> : null}
-      {justBuzzed ? (
+      {justBuzzed && !locked ? (
         <BuzzerResult
           key={justBuzzed.id}
           o={justBuzzed}

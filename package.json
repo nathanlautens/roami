@@ -60,7 +60,8 @@
     "test:open": "node supabase/tests/open-roams.test.mjs",
     "test:release": "node supabase/tests/release.test.mjs",
     "screenshots": "node store/make-screenshots.mjs",
-    "test:push": "node supabase/tests/safety-push.test.mjs"
+    "test:push": "node supabase/tests/safety-push.test.mjs",
+    "test:fixes": "node supabase/tests/bug-fixes.test.mjs"
   },
   "private": true
 }

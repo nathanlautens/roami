@@ -181,6 +181,10 @@ const ERRORS: Record<string, string> = {
   not_friends: 'You can only bring your own friends.',
   already_invited: "They're already on this Roam.",
   not_host: 'Only the host can do that.',
+  blocked: "You can't add this person.",
+  invalid_friend: "You can't add yourself. Iconic, though.",
+  host_use_cant_make_it: "You're hosting. Use \"I can't make it\" instead.",
+  too_many_reports: 'Slow down a sec and try again later.',
 };
 
 export function friendlyError(e: unknown): string {

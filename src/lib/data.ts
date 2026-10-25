@@ -221,7 +221,8 @@ export function useArchive() {
         .select(`roam_id, user_id, response, note, responded_at, roam:roams!inner(*, host:profiles!roams_host_id_fkey(${PROFILE}))`)
         .eq('user_id', userId)
         .or(`ends_at.lte.${now},status.eq.cancelled`, { referencedTable: 'roam' })
-        .order('starts_at', { referencedTable: 'roam', ascending: false })
+        // Newest invites first, so the 200 kept are your latest (not a random 200).
+        .order('invited_at', { ascending: false })
         .limit(200);
       if (error) throw error;
 

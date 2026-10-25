@@ -91,4 +91,5 @@ npm run test:mock
 npm run test:open
 npm run test:release
 npm run test:push
+npm run test:fixes
 ```

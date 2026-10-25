@@ -48,11 +48,13 @@ export default function SendRoam() {
   const [buzzerId, setBuzzerId] = useState<string | null>(null);
   const [idea, setIdea] = useState('');
 
+  // Only current friends can be invited, so the count on the button is the real count.
   const invitees = useMemo(() => {
-    const ids = new Set(people);
-    for (const c of circles) if (circleIds.has(c.id)) c.members.forEach((m) => ids.add(m.id));
+    const friendIds = new Set(friends.friends.map((f) => f.id));
+    const ids = new Set([...people].filter((id) => friendIds.has(id)));
+    for (const c of circles) if (circleIds.has(c.id)) c.members.forEach((m) => friendIds.has(m.id) && ids.add(m.id));
     return ids;
-  }, [circles, circleIds, people]);
+  }, [circles, circleIds, people, friends.friends]);
 
   function toggle(set: Set<string>, setter: (s: Set<string>) => void, id: string) {
     Haptics.selectionAsync().catch(() => {});
