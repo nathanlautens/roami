@@ -33,7 +33,10 @@
         "android.permission.READ_CALENDAR",
         "android.permission.WRITE_CALENDAR"
       ],
-      "allowBackup": false
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -50,7 +53,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Pick a profile pic so your friends know it's you.",
-          "cameraPermission": "Snap a profile pic so your friends know it's you."
+          "cameraPermission": "Snap a profile pic so your friends know it's you.",
+          "microphonePermission": false
         }
       ],
       "expo-notifications",

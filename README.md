@@ -2,7 +2,7 @@
 
 Plans, minus the admin. Throw out a Roam, see who bites.
 
-An iOS + Android app (no web) built with Expo SDK 57, Expo Router and Supabase.
+An iOS + Android app (no web) built with Expo SDK 58, Expo Router and Supabase.
 
 ## One-time setup
 
@@ -97,5 +97,4 @@ npm run test:release
 npm run test:push
 npm run test:fixes
 npm run test:security
-npm run test:decoder
 ```

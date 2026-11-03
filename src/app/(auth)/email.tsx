@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View, type TextInputInstance } from 'react-native';
 
 import { Body, Button, Field, H1, Label, Progress, Screen, Sticker, TopBar } from '@/components/ui';
 import { REVIEW_EMAIL } from '@/lib/config';
@@ -18,7 +18,7 @@ export default function EmailLogin() {
   const [resendIn, setResendIn] = useState(0);
   const [password, setPassword] = useState('');
   const isReviewer = email.trim().toLowerCase() === REVIEW_EMAIL;
-  const codeRef = useRef<TextInput>(null);
+  const codeRef = useRef<TextInputInstance>(null);
   const verifying = useRef(false);
 
   useEffect(() => {
