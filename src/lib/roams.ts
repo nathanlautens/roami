@@ -185,6 +185,8 @@ const ERRORS: Record<string, string> = {
   invalid_friend: "You can't add yourself. Iconic, though.",
   host_use_cant_make_it: "You're hosting. Use \"I can't make it\" instead.",
   too_many_reports: 'Slow down a sec and try again later.',
+  too_many_requests: "That's a lot of friend requests. Try again in a bit.",
+  invalid_avatar: 'That photo needs uploading again.',
 };
 
 export function friendlyError(e: unknown): string {

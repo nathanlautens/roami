@@ -7,7 +7,7 @@ An iOS + Android app (no web) built with Expo SDK 57, Expo Router and Supabase.
 ## One-time setup
 
 ### 1. Create the database
-In the [Supabase dashboard](https://supabase.com/dashboard/project/iounsooetwcgfruvnylj) open **SQL Editor → New query**, paste the whole of
+In the [Supabase dashboard](https://supabase.com/dashboard) open **SQL Editor → New query**, paste the whole of
 `supabase/migrations/20261014200000_initial_schema.sql`, and press **Run**.
 
 This creates the tables, the privacy rules (row level security), the functions the app calls, live updates, and the `avatars` photo bucket.
@@ -44,6 +44,10 @@ Friends testing the app can't see the table, so you'll need to send them their c
 Before real users: disable the hook and connect a real SMS provider (e.g. Twilio Verify) under the Phone provider settings.
 
 ### 3. Run it on your phone
+First, give the app your Supabase settings (they're kept out of the code):
+```bash
+cp .env.example .env   # then fill in the URL and publishable key from Supabase -> Project Settings -> API Keys
+```
 ```bash
 npm install
 npm start
@@ -92,4 +96,6 @@ npm run test:open
 npm run test:release
 npm run test:push
 npm run test:fixes
+npm run test:security
+npm run test:decoder
 ```

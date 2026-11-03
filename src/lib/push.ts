@@ -77,7 +77,8 @@ export function listenForPushTaps(open: (url: string) => void): () => void {
       if (id && readHandled() === id) return;
       writeHandled(id);
       const url = response.notification.request.content.data?.url;
-      if (typeof url === 'string' && url.startsWith('/')) open(url);
+      // Only Roami's own screens: a path like /roam/<id>, never another site.
+      if (typeof url === 'string' && /^\/(?!\/)[A-Za-z0-9/_-]*$/.test(url)) open(url);
     };
     // The tap that launched the app (if any), then later taps.
     handle(Notifications.getLastNotificationResponse());

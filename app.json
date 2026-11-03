@@ -32,7 +32,8 @@
       "permissions": [
         "android.permission.READ_CALENDAR",
         "android.permission.WRITE_CALENDAR"
-      ]
+      ],
+      "allowBackup": false
     },
     "plugins": [
       "expo-router",
@@ -64,7 +65,8 @@
         {
           "calendarPermission": "Roami adds Roams you're in on to your calendar and shows what's already on when you're picking a night."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

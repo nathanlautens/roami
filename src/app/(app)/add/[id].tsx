@@ -16,12 +16,10 @@ export default function AddFriend() {
   const [state, setState] = useState<'idle' | 'busy' | 'requested' | 'accepted'>('idle');
 
   useEffect(() => {
+    // The full id in an invite link is the invitation, so the server shares just this one profile.
     supabase
-      .from('profiles')
-      .select('id, display_name, avatar_url')
-      .eq('id', id)
-      .maybeSingle()
-      .then(({ data }) => setPerson(data as Profile | null));
+      .rpc('profile_for_invite', { p_id: id })
+      .then(({ data }) => setPerson(((data ?? []) as Profile[])[0] ?? null));
   }, [id]);
 
   async function add() {

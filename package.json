@@ -7,9 +7,12 @@
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo/ui": "~57.0.24",
     "@supabase/supabase-js": "^2.117.3",
+    "aes-js": "^3.1.2",
+    "decode-uri-component": "file:vendor/decode-uri-component",
     "expo": "~57.0.29",
     "expo-calendar": "~57.0.5",
     "expo-constants": "~57.0.22",
+    "expo-crypto": "~57.0.4",
     "expo-dev-client": "~57.0.20",
     "expo-device": "~57.0.2",
     "expo-file-system": "~57.0.7",
@@ -22,6 +25,7 @@
     "expo-local-authentication": "~57.0.3",
     "expo-notifications": "~57.0.23",
     "expo-router": "~57.0.27",
+    "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.10",
     "expo-sqlite": "~57.0.4",
     "expo-status-bar": "~57.0.1",
@@ -41,6 +45,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.10",
+    "@types/aes-js": "^3.1.4",
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
@@ -61,7 +66,12 @@
     "test:release": "node supabase/tests/release.test.mjs",
     "screenshots": "node store/make-screenshots.mjs",
     "test:push": "node supabase/tests/safety-push.test.mjs",
-    "test:fixes": "node supabase/tests/bug-fixes.test.mjs"
+    "test:fixes": "node supabase/tests/bug-fixes.test.mjs",
+    "test:security": "node supabase/tests/security.test.mjs",
+    "test:decoder": "node vendor/decode-uri-component/test.mjs"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "decode-uri-component": "file:vendor/decode-uri-component"
+  }
 }

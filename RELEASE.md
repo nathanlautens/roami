@@ -27,6 +27,7 @@ Do the steps in order. Anything marked ⏳ involves waiting on Apple or Google, 
 2. **SQL Editor → New query**: paste all of `supabase/migrations/20261016210000_release_ready.sql` and **Run**.
 3. New query again: paste all of `supabase/migrations/20261016220000_safety_and_push.sql` and **Run**.
 4. New query again: paste all of `supabase/migrations/20261025000000_bug_fixes.sql` and **Run** (fixes from the October code review; safe to run more than once).
+5. New query again: paste all of `supabase/migrations/20261103000000_security_hardening.sql` and **Run** (security fixes: profiles are only visible to people you're connected to, photo checks, rate limits; safe to run more than once).
 
 The first file adds "Delete my account", the every-minute buzzer, and locks the test helpers so real users can't create fake friends.
 To use test friends again while testing, run the `grant …` line at the bottom of that file.
@@ -58,8 +59,31 @@ Supabase's built-in email only sends to members of your Supabase team, two an ho
 Subject: `Your Roami code: {{ .Token }}`
 
 ### 2d. Login settings
-- **Authentication → Sign In / Providers → Email**: enabled.
+- **Authentication → Sign In / Providers → Email**: enabled, with **Confirm email** on.
 - **Allow anonymous sign-ins**: turn **off** (the app no longer uses it).
+- **Phone** provider: turn **off**, and under **Authentication → Hooks** switch off the **Send SMS hook** if it's on (Roami signs in with email; the old test hook has been removed).
+- **Authentication → Attack Protection**: turn on **leaked password protection** (covers the reviewer account).
+
+### 2f. Supabase settings for the app (not in the code)
+The app reads its Supabase address and publishable key from the environment, so they're not in the public repo.
+
+**On your Mac** (for Expo Go and local builds), in the project folder:
+```bash
+cp .env.example .env
+```
+Then open `.env` and fill in both values from **Supabase → Project Settings → API Keys** (the **publishable** key, `sb_publishable_…`; never a secret key). `.env` is git-ignored.
+
+**For EAS builds** (TestFlight / Play), store them in EAS once:
+```bash
+for env in production preview development; do
+  npx eas-cli@latest env:set --name EXPO_PUBLIC_SUPABASE_URL --value "https://YOUR-REF.supabase.co" --environment $env --visibility plaintext
+  npx eas-cli@latest env:set --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "sb_publishable_…" --environment $env --visibility plaintext
+done
+```
+(Plain text is right for these: anything starting `EXPO_PUBLIC_` ends up inside the app, so it must never be a secret. You can also add them in the Expo dashboard under your project's **Environment variables**.)
+If either is missing, the app stops on launch with a message saying so.
+
+**Rotate the key once:** the old publishable key is still in this repo's git history. In **Supabase → Project Settings → API Keys**, create a new publishable key, put it in `.env` and EAS as above, then delete the old one. The old value in history is then useless.
 
 ### 2e. A login for the app reviewers
 Reviewers can't receive your email codes, so the app lets one account use a password:

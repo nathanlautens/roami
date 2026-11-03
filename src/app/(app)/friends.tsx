@@ -56,14 +56,10 @@ export default function Friends() {
       return;
     }
     setAdding(true);
-    const { data: found } = await supabase
-      .from('profiles')
-      .select('id, display_name')
-      .gte('id', `${clean}-0000-0000-0000-000000000000`)
-      .lte('id', `${clean}-ffff-ffff-ffff-ffffffffffff`)
-      .not('display_name', 'is', null)
-      .limit(2);
-    if (!found || found.length !== 1) {
+    // Looked up on the server, one person at a time (profiles aren't listable).
+    const { data } = await supabase.rpc('find_by_friend_code', { p_code: clean });
+    const found = (data ?? []) as { id: string; display_name: string }[];
+    if (found.length !== 1) {
       setAdding(false);
       Alert.alert('No one by that code', 'Double-check it with your friend?');
       return;

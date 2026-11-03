@@ -1,0 +1,7 @@
+{
+  "name": "decode-uri-component",
+  "version": "0.2.3-roami.1",
+  "description": "Linear-time drop-in for decode-uri-component@0.2 (fixes GHSA-vcc3-ghjq-m6fr and GHSA-qr28-fpjm-wq7f). Used by expo-router's query-string.",
+  "main": "index.js",
+  "license": "MIT"
+}
