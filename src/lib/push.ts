@@ -53,9 +53,20 @@ export async function registerForPush(userId: string) {
     // older devices: the server falls back to London
   }
 
-  await supabase
+  // Skip the write when nothing changed today. (Re-saved daily anyway: the server keeps one
+  // token per person, so a second phone can take it over and this one should win it back.)
+  const saved = `${userId}|${token}|${time_zone}|${new Date().toDateString()}`;
+  if (kv.get(SAVED_KEY) === saved) return;
+  const { error } = await supabase
     .from('push_tokens')
     .upsert({ user_id: userId, token, time_zone, updated_at: new Date().toISOString() });
+  if (!error) kv.set(SAVED_KEY, saved);
+}
+
+const SAVED_KEY = 'roami.pushTokenSaved';
+/** Signing out deletes the token on the server, so the next sign-in must save it again. */
+export function forgetSavedPushToken() {
+  kv.set(SAVED_KEY, null);
 }
 
 /**

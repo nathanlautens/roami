@@ -1,10 +1,16 @@
 import type { Session } from '@supabase/supabase-js';
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { SKIP_LOGIN } from './config';
-import { registerForPush } from './push';
+import { forgetSavedPushToken, registerForPush } from './push';
+import { kv } from './storage';
 import { supabase } from './supabase';
 import type { Profile } from './types';
+
+// Your own profile, kept on the phone so the app opens straight away (and
+// offline) without waiting for the network.
+const profileKey = (id: string) => `roami.profile.${id}`;
+const cachedProfile = (id: string) => kv.getJSON<Profile | null>(profileKey(id), null);
 
 type AuthState = {
   ready: boolean;
@@ -34,12 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       return;
     }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('id, display_name, avatar_url')
       .eq('id', id)
       .maybeSingle();
-    setProfile(data ?? { id, display_name: null, avatar_url: null });
+    // Offline or a blip: keep what we have. Treating a failed load as "no profile"
+    // would send a signed-in person back to onboarding.
+    if (error) return;
+    const next = data ?? { id, display_name: null, avatar_url: null };
+    kv.setJSON(profileKey(id), next);
+    setProfile(next);
   }, []);
 
   const signInQuietly = useCallback(async () => {
@@ -52,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data.session;
   }, []);
 
+  // Whose profile is loaded, so token refreshes (hourly) don't reload it.
+  const profileFor = useRef<string | null>(null);
+
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(async ({ data }) => {
@@ -60,15 +74,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Testing mode: no phone login, just a background anonymous account.
       if (!current && SKIP_LOGIN) current = await signInQuietly();
       if (!mounted) return;
+      const id = current?.user.id ?? null;
+      profileFor.current = id;
       setSession(current);
-      await loadProfile(current?.user.id ?? null);
-      if (mounted) setReady(true);
+      const cached = id ? cachedProfile(id) : null;
+      if (cached?.display_name) {
+        // Open with what we know, refresh in the background.
+        setProfile(cached);
+        setReady(true);
+        loadProfile(id);
+      } else {
+        await loadProfile(id);
+        if (mounted) setReady(true);
+      }
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
+      const id = next?.user.id ?? null;
+      if (id === profileFor.current) return;
+      // Signed out (any way, including deleting the account): forget the cached profile.
+      if (profileFor.current) {
+        kv.set(profileKey(profileFor.current), null);
+        forgetSavedPushToken();
+      }
+      profileFor.current = id;
+      if (id) {
+        const cached = cachedProfile(id);
+        if (cached) setProfile(cached);
+      }
       // Don't await inside the callback (Supabase recommends deferring other calls).
-      setTimeout(() => loadProfile(next?.user.id ?? null), 0);
+      setTimeout(() => loadProfile(id), 0);
     });
 
     return () => {
@@ -95,7 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshProfile: () => loadProfile(userId),
     signOut: async () => {
       // Stop this phone getting pushes for this account (must happen while still signed in).
-      if (userId) await supabase.from('push_tokens').delete().eq('user_id', userId);
+      if (userId) {
+        await supabase.from('push_tokens').delete().eq('user_id', userId);
+        kv.set(profileKey(userId), null);
+      }
       await supabase.auth.signOut();
     },
   };
