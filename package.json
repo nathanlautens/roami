@@ -56,17 +56,9 @@
     "ios": "expo start --go --ios",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test:db": "node supabase/tests/schema.test.mjs supabase/migrations/20261014200000_initial_schema.sql",
-    "test:sms-hook": "node supabase/tests/sms-hook.test.mjs supabase/migrations/20261014210000_dev_sms_hook.sql",
     "start:dev": "expo start --dev-client",
-    "test:mock": "node supabase/tests/mock-friends.test.mjs",
-    "test:open": "node supabase/tests/open-roams.test.mjs",
-    "test:release": "node supabase/tests/release.test.mjs",
     "screenshots": "node store/make-screenshots.mjs",
-    "test:push": "node supabase/tests/safety-push.test.mjs",
-    "test:fixes": "node supabase/tests/bug-fixes.test.mjs",
-    "test:security": "node supabase/tests/security.test.mjs",
-    "test:indexes": "node supabase/tests/indexes.test.mjs"
+    "test": "for f in supabase/tests/*.test.mjs; do echo \"== $f\"; node \"$f\" || exit 1; done"
   },
   "private": true
 }

@@ -27,10 +27,4 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run lint
-      - name: Database tests
-        run: |
-          for t in db sms-hook mock open release push fixes security indexes; do
-            echo "::group::test:$t"
-            npm run -s "test:$t"
-            echo "::endgroup::"
-          done
+      - run: npm test

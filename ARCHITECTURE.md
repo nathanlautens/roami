@@ -17,7 +17,7 @@ src/lib/            Everything that isn't a screen:
   storage.ts          On-device settings (cached key-value store)
   calendar.ts, push.ts, updates.ts, biometric.ts
 supabase/migrations Schema, privacy rules (RLS), RPCs, cron jobs, indexes
-supabase/tests      PGlite tests for the database (npm run test:*)
+supabase/tests      PGlite tests for the database (npm test)
 ```
 
 The database is the source of truth for every rule (who can see what, limits, the buzzer). The app calls RPCs for anything with rules and reads tables directly where RLS is enough.

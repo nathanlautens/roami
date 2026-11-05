@@ -75,7 +75,7 @@ npx eas-cli@latest build --profile development --platform ios     # or android
 | `src/lib` | Supabase client, auth, data hooks, Roam rules, calendar sync, push |
 | `store/` | Store screenshots (`npm run screenshots`) |
 | `supabase/migrations` | The database schema |
-| `supabase/tests` | Tests for the schema's rules (`npm run test:db`) |
+| `supabase/tests` | Tests for the schema's rules (`npm test`) |
 
 ## Rules the app follows (from the spec)
 
@@ -89,13 +89,5 @@ npx eas-cli@latest build --profile development --platform ios     # or android
 ```bash
 npm run typecheck
 npx expo lint
-npm run test:db
-npm run test:sms-hook
-npm run test:mock
-npm run test:open
-npm run test:release
-npm run test:push
-npm run test:fixes
-npm run test:security
-npm run test:indexes
+npm test
 ```
