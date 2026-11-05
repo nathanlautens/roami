@@ -35,6 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const userId = session?.user.id ?? null;
 
+  // Whose profile is loaded, so token refreshes (hourly) don't reload it.
+  const profileFor = useRef<string | null>(null);
+
   const loadProfile = useCallback(async (id: string | null) => {
     if (!id) {
       setProfile(null);
@@ -48,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Offline or a blip: keep what we have. Treating a failed load as "no profile"
     // would send a signed-in person back to onboarding.
     if (error) return;
+    // Signed out or switched accounts while this was loading: it's stale.
+    if (profileFor.current !== id) return;
     const next = data ?? { id, display_name: null, avatar_url: null };
     kv.setJSON(profileKey(id), next);
     setProfile(next);
@@ -62,9 +67,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginError(null);
     return data.session;
   }, []);
-
-  // Whose profile is loaded, so token refreshes (hourly) don't reload it.
-  const profileFor = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
