@@ -62,7 +62,8 @@
     "screenshots": "node store/make-screenshots.mjs",
     "test:push": "node supabase/tests/safety-push.test.mjs",
     "test:fixes": "node supabase/tests/bug-fixes.test.mjs",
-    "test:security": "node supabase/tests/security.test.mjs"
+    "test:security": "node supabase/tests/security.test.mjs",
+    "test:indexes": "node supabase/tests/indexes.test.mjs"
   },
   "private": true
 }

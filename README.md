@@ -97,4 +97,5 @@ npm run test:release
 npm run test:push
 npm run test:fixes
 npm run test:security
+npm run test:indexes
 ```
