@@ -12,6 +12,7 @@ import { AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { CrashScreen } from '@/components/crash-screen';
 import { LockScreen } from '@/components/lock-screen';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { isUnlockEnabled } from '@/lib/biometric';
@@ -20,8 +21,12 @@ import { listenForPushTaps } from '@/lib/push';
 import { queryClient } from '@/lib/query';
 import { useRealtimeSync } from '@/lib/realtime';
 import { colors } from '@/lib/theme';
+import { useUpdateChecks } from '@/lib/updates';
 
 SplashScreen.preventAutoHideAsync();
+
+// A crash while drawing any screen shows a recovery screen instead of a blank app.
+export const ErrorBoundary = CrashScreen;
 
 // Coming back to the app after this long asks for Face ID / fingerprint again.
 const RELOCK_AFTER_MS = 5 * 60_000;
@@ -95,6 +100,7 @@ function Routes() {
 }
 
 export default function RootLayout() {
+  useUpdateChecks();
   const [fontsLoaded, fontError] = useFonts({
     BricolageGrotesque_700Bold,
     BricolageGrotesque_800ExtraBold,
