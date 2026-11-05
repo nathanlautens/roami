@@ -16,7 +16,7 @@ import { CrashScreen } from '@/components/crash-screen';
 import { LockScreen } from '@/components/lock-screen';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { isUnlockEnabled } from '@/lib/biometric';
-import { setAppLocked } from '@/lib/lock';
+import { setAppLocked } from '@/lib/signals';
 import { listenForPushTaps } from '@/lib/push';
 import { queryClient } from '@/lib/query';
 import { useRealtimeSync } from '@/lib/realtime';

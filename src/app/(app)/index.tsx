@@ -13,15 +13,11 @@ import { UnlockPrompt } from '@/components/unlock-prompt';
 import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { syncCalendar } from '@/lib/calendar';
-import { SKIP_LOGIN } from '@/lib/config';
-import { useAppLocked } from '@/lib/lock';
+import { useAppLocked } from '@/lib/signals';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
 import { markBuzzerSeen, resolveDue, seenBuzzers, useOpenRoams, useTick } from '@/lib/open-roams';
-import { effectiveResponse, isActive } from '@/lib/roams';
+import { DAYS, effectiveResponse, isActive, MONTHS } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
-
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function Feed() {
   const { profile, userId } = useAuth();
@@ -68,31 +64,17 @@ export default function Feed() {
   };
 
   const sections = useMemo(() => {
-    const byStart = (a: FeedItem, b: FeedItem) => a.roam.starts_at.localeCompare(b.roam.starts_at);
-    const waiting: FeedItem[] = [];
-    const grabs: FeedItem[] = [];
-    const mine: FeedItem[] = [];
-    const going: FeedItem[] = [];
-    const passed: FeedItem[] = [];
-    for (const it of items) {
-      const { roam, mine: inv } = it;
-      const response = effectiveResponse(inv, roam);
-      if (!isActive(roam)) continue; // over or called off: lives in the Archive
-      if (roam.host_id === me) mine.push(it);
-      else if (roam.status === 'up_for_grabs') {
-        // Only people who are In can take it over; for everyone else it's on hold.
-        if (response === 'in') grabs.push(it);
-      } else if (response === null || response === 'maybe') waiting.push(it);
-      else if (response === 'in') going.push(it);
-      else passed.push(it); // said Can't (you can still change your mind)
+    const out: Record<Variant, FeedItem[]> = { going: [], grabs: [], mine: [], hot: [], quiet: [] };
+    for (const it of [...items].sort((x, y) => x.roam.starts_at.localeCompare(y.roam.starts_at))) {
+      const response = effectiveResponse(it.mine, it.roam);
+      if (!isActive(it.roam)) continue; // over or called off: lives in the Archive
+      if (it.roam.host_id === me) out.mine.push(it);
+      // Up for grabs: only people who are In can take it over; for everyone else it's on hold.
+      else if (it.roam.status === 'up_for_grabs') response === 'in' && out.grabs.push(it);
+      else if (response === null || response === 'maybe') out.hot.push(it);
+      else out[response === 'in' ? 'going' : 'quiet'].push(it); // quiet: said Can't (can still change their mind)
     }
-    return {
-      waiting: waiting.sort(byStart),
-      grabs: grabs.sort(byStart),
-      mine: mine.sort(byStart),
-      going: going.sort(byStart),
-      passed: passed.sort(byStart),
-    };
+    return out;
   }, [items, me]);
 
   const now = new Date();
@@ -149,26 +131,18 @@ export default function Feed() {
           </Pressable>
         ) : null}
 
-        {/* Feed order (v1): what you've committed to, then what you're hosting, then what's waiting on you.
-            Revisit once calendar integrations exist (v2). */}
         {buzzing.length ? (
-          <View style={{ gap: 12, marginTop: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.yellow, borderWidth: 2, borderColor: colors.ink }} />
-              <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>
-                BUZZING · {buzzing.length}
-              </Text>
-            </View>
-            {buzzing.map((o) => (
-              <OpenRoamCard key={o.id} o={o} me={me} now={tick} />
-            ))}
-          </View>
+          <Section dot={colors.yellow} title="Buzzing" count={buzzing.length}>
+            {buzzing.map((o) => <OpenRoamCard key={o.id} o={o} me={me} now={tick} />)}
+          </Section>
         ) : null}
-        <Section dot={colors.lilac} title="You're in" items={sections.going} me={me} variant="going" />
-        <Section dot={colors.yellow} title="Up for grabs" items={sections.grabs} me={me} variant="grabs" />
-        <Section dot={colors.lime} title="Your Roams" items={sections.mine} me={me} variant="mine" />
-        <Section dot={colors.pink} title="Waiting on you" items={sections.waiting} me={me} variant="hot" />
-        <Section dot={colors.mute} title="You passed" items={sections.passed} me={me} variant="quiet" />
+        {FEED_SECTIONS.map(([variant, title, dot]) =>
+          sections[variant].length ? (
+            <Section key={variant} dot={dot} title={title} count={sections[variant].length}>
+              {sections[variant].map((it) => <RoamCard key={it.roam.id} item={it} me={me} variant={variant} />)}
+            </Section>
+          ) : null,
+        )}
 
         <Pressable
           accessibilityRole="button"
@@ -189,7 +163,7 @@ export default function Feed() {
 
       <NavBar />
       <SentCelebration />
-      {!SKIP_LOGIN ? <UnlockPrompt /> : null}
+      <UnlockPrompt />
       {justBuzzed && !locked ? (
         <BuzzerResult
           key={justBuzzed.id}
@@ -205,31 +179,26 @@ export default function Feed() {
   );
 }
 
-function Section({
-  dot,
-  title,
-  items,
-  me,
-  variant,
-}: {
-  dot: string;
-  title: string;
-  items: FeedItem[];
-  me: string;
-  variant: 'going' | 'hot' | 'mine' | 'grabs' | 'quiet';
-}) {
-  if (!items.length) return null;
+type Variant = 'going' | 'grabs' | 'mine' | 'hot' | 'quiet';
+// Feed order: what you've committed to, then what you're hosting, then what's waiting on you.
+const FEED_SECTIONS: [Variant, string, string][] = [
+  ['going', "You're in", colors.lilac],
+  ['grabs', 'Up for grabs', colors.yellow],
+  ['mine', 'Your Roams', colors.lime],
+  ['hot', 'Waiting on you', colors.pink],
+  ['quiet', 'You passed', colors.mute],
+];
+
+function Section({ dot, title, count, children }: { dot: string; title: string; count: number; children: React.ReactNode }) {
   return (
     <View style={{ gap: 12, marginTop: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dot, borderWidth: 2, borderColor: colors.ink }} />
         <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>
-          {title.toUpperCase()} · {items.length}
+          {title.toUpperCase()} · {count}
         </Text>
       </View>
-      {items.map((it) => (
-        <RoamCard key={it.roam.id} item={it} me={me} variant={variant} />
-      ))}
+      {children}
     </View>
   );
 }

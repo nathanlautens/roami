@@ -17,31 +17,11 @@ This creates the tables, the privacy rules (row level security), the functions t
 ### 2. Login
 Release builds use an **email code once, then Face ID / fingerprint** (see RELEASE.md for the Supabase email setup).
 
-### 2-old. Testing mode: no login (off by default)
-Set `SKIP_LOGIN = true` in `src/lib/config.ts` to skip login. Each phone is signed in anonymously in the background, then asked for a name and photo. Nothing else changes: privacy rules and data work exactly as with phone login.
-
-One switch in Supabase: **Authentication → Sign In / Providers → Allow anonymous sign-ins → on → Save**.
-
-To add friends in testing mode, use the **friend code** on the Friends screen (contacts matching needs phone login).
-
 ### 2a. Test friends (optional)
 Paste `supabase/migrations/20261014230000_mock_friends.sql` into **SQL Editor** and **Run**. Then in the app (dev builds / Expo Go only) tap **Load test friends**, on the Friends screen or the empty home feed. You get 10 mock friends split across 2 circles, 2 Roams waiting for you, and mock friends who answer your Roams instantly. **Remove test friends** clears them.
 
 ### 2b. Open Roams + the buzzer
 Paste `supabase/migrations/20261015000000_open_roams.sql` into **SQL Editor** and **Run** (after the mock friends SQL). In the app: **+ → Find a night** to pick nights, invite people and set a buzzer. At the buzzer the top night locks into a normal Roam. In dev builds, **Start a test vote** (Friends → Test mode) has a test friend start one with a 3-minute buzzer.
-
-### 2c. Later: turn on phone login (free, no SMS provider)
-Set `SKIP_LOGIN = false` in `src/lib/config.ts`, then:
-
-While testing, login codes aren't texted. They're saved to a table you can read in the dashboard.
-
-1. **SQL Editor → New query**: paste the whole of `supabase/migrations/20261014210000_dev_sms_hook.sql` and **Run**.
-2. **Authentication → Sign In / Providers → Phone**: switch it on, with phone signups allowed.
-3. **Authentication → Hooks → Send SMS hook**: choose **Postgres**, schema `public`, function `send_sms_hook`, and enable it.
-4. In the app, enter a phone number. Then open **Table Editor → dev_sms_codes** to find the 6-digit code. Codes also appear in **Logs → Postgres**.
-
-Friends testing the app can't see the table, so you'll need to send them their code.
-Before real users: disable the hook and connect a real SMS provider (e.g. Twilio Verify) under the Phone provider settings.
 
 ### 3. Run it on your phone
 First, give the app your Supabase settings (they're kept out of the code):

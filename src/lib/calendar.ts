@@ -1,33 +1,21 @@
 import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
+import { clock } from './roams';
 import { kv } from './storage';
 import { supabase } from './supabase';
 
 /**
- * Calendar sync with the calendars on this phone: Apple Calendar on iPhone
- * (plus any Google calendars added in Settings), and the phone's calendar on
- * Android (which is Google Calendar).
- *
- *  a) Roams you're In on (or hosting) are added to the calendar you choose.
- *  b) Saying Can't, the host calling it off, or being removed takes them out.
- *     Edits to the time, place or plan update the event.
- *  c) When you're deciding (answering a Roam, voting on nights, picking
- *     nights), Roami shows what's already on your calendar.
- *
- * Calendar access isn't in Expo Go; it works in TestFlight / Play builds.
- * Event ids only make sense on this phone, so the link between a Roam and its
- * calendar event is stored on the phone.
+ * Sync with the phone's calendars (Apple Calendar, or Google Calendar on Android): Roams you're In
+ * on are added, updated and removed, and your own plans are shown when you decide. Event ids only
+ * make sense on this phone, so the Roam-to-event links are stored here. Not available in Expo Go.
  */
 
 type CalendarModule = typeof import('expo-calendar');
 let mod: Promise<CalendarModule> | null = null;
-function cal() {
-  mod ??= import('expo-calendar');
-  return mod;
-}
+const cal = () => (mod ??= import('expo-calendar'));
 
-export const calendarAvailable = !isRunningInExpoGo() && Platform.OS !== 'web';
+export const calendarAvailable = !isRunningInExpoGo();
 
 // ─── Preferences (on this phone) ────────────────────────────────
 
@@ -37,48 +25,26 @@ type Link = { eventId: string; starts: string; ends: string; what: string; locat
 const PREFS_KEY = 'roami.calendar.prefs';
 const LINKS_KEY = 'roami.calendar.links';
 
-const readJSON = kv.getJSON;
-const writeJSON = kv.setJSON;
 
 export function calendarPrefs(): Prefs {
-  return readJSON<Prefs>(PREFS_KEY, { sync: false, calendarId: null, showPlans: false, asked: false });
+  return kv.getJSON<Prefs>(PREFS_KEY, { sync: false, calendarId: null, showPlans: false, asked: false });
 }
 export function setCalendarPrefs(patch: Partial<Prefs>) {
-  writeJSON(PREFS_KEY, { ...calendarPrefs(), ...patch, asked: true });
+  kv.setJSON(PREFS_KEY, { ...calendarPrefs(), ...patch, asked: true });
 }
-function links(): Record<string, Link> {
-  return readJSON<Record<string, Link>>(LINKS_KEY, {});
-}
-function saveLinks(l: Record<string, Link>) {
-  writeJSON(LINKS_KEY, l);
-}
+const links = () => kv.getJSON<Record<string, Link>>(LINKS_KEY, {});
+const saveLinks = (l: Record<string, Link>) => kv.setJSON(LINKS_KEY, l);
 
 // ─── Access + calendars ─────────────────────────────────────────
 
-export async function requestCalendarAccess() {
-  if (!calendarAvailable) return false;
-  const C = await cal();
-  const { status } = await C.requestCalendarPermissions();
-  return status === 'granted';
-}
-
-export async function hasCalendarAccess() {
-  if (!calendarAvailable) return false;
-  try {
-    const C = await cal();
-    const { status } = await C.getCalendarPermissions();
-    return status === 'granted';
-  } catch {
-    return false;
-  }
-}
+export const requestCalendarAccess = async () => calendarAvailable && (await (await cal()).requestCalendarPermissions()).status === 'granted';
+const hasCalendarAccess = async () =>
+  calendarAvailable && (await (await cal()).getCalendarPermissions().catch(() => null))?.status === 'granted';
 
 export type PhoneCalendar = { id: string; title: string; color: string | null; account: string | null };
 
 export async function writableCalendars(): Promise<PhoneCalendar[]> {
-  const C = await cal();
-  const all = await C.getCalendars();
-  return all
+  return (await (await cal()).getCalendars())
     .filter((c) => c.allowsModifications && (c.entityType === undefined || String(c.entityType) === 'event'))
     .map((c) => ({ id: c.id, title: c.title, color: c.color ?? null, account: c.source?.name ?? null }));
 }
@@ -229,14 +195,7 @@ async function doSync(userId: string) {
       continue;
     }
     if (r && shouldBeIn(r)) continue;
-    if (link.eventId) {
-      try {
-        const event = await C.ExpoCalendarEvent.get(link.eventId);
-        await event.delete();
-      } catch {
-        // already gone
-      }
-    }
+    await deleteEvent(C, link.eventId);
     delete linked[roamId];
   }
 
@@ -247,17 +206,13 @@ async function doSync(userId: string) {
 export async function removeAllRoamiEvents() {
   if (!calendarAvailable) return;
   const C = await cal();
-  const l = links();
-  for (const link of Object.values(l)) {
-    if (!link.eventId) continue;
-    try {
-      const event = await C.ExpoCalendarEvent.get(link.eventId);
-      await event.delete();
-    } catch {
-      // already gone
-    }
-  }
+  for (const link of Object.values(links())) await deleteEvent(C, link.eventId);
   saveLinks({});
+}
+
+async function deleteEvent(C: CalendarModule, eventId: string) {
+  if (!eventId) return;
+  await C.ExpoCalendarEvent.get(eventId).then((e) => e.delete()).catch(() => {}); // already gone is fine
 }
 
 // ─── c) What's already on your calendar ─────────────────────────
@@ -282,12 +237,4 @@ export async function busyBetween(start: Date, end: Date): Promise<BusyEvent[]> 
   }
 }
 
-export function busyLabel(e: BusyEvent) {
-  if (e.allDay) return `${e.title} (all day)`;
-  const t = (d: Date) => {
-    const h = d.getHours() % 12 || 12;
-    const m = d.getMinutes();
-    return `${h}${m ? `:${String(m).padStart(2, '0')}` : ''}${d.getHours() >= 12 ? 'pm' : 'am'}`;
-  };
-  return `${e.title}, ${t(e.start)}–${t(e.end)}`;
-}
+export const busyLabel = (e: BusyEvent) => (e.allDay ? `${e.title} (all day)` : `${e.title}, ${clock(e.start)}–${clock(e.end)}`);

@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View, type TextInputInstance } from 'react-native';
 
 import { Body, Button, Field, H1, Label, Progress, Screen, Sticker, TopBar } from '@/components/ui';
-import { REVIEW_EMAIL } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 
+// Store reviewers can't receive codes, so this one account (Supabase -> Authentication -> Users) uses a password.
+const REVIEW_EMAIL = 'review@roami.test';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /** Sign up or log in with an email code. After this, Face ID / fingerprint unlocks the app. */

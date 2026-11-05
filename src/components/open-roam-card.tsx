@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
-import { buzzerIn, nightShort, standings, vibeName, type OpenRoam } from '@/lib/open-roams';
+import { buzzerIn, nightShort, standings, type OpenRoam } from '@/lib/open-roams';
+import { vibeLabel } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
 import { Avatar, Sticker, Tag } from './ui';
 
@@ -11,7 +12,7 @@ export function OpenRoamCard({ o, me, now }: { o: OpenRoam; me: string; now: num
   const amHost = o.host_id === me;
   const iVoted = !!o.people.find((p) => p.user_id === me)?.voted_at;
   const total = o.people.length;
-  const leading = [s.leadNight ? nightShort(s.leadNight) : null, vibeName(s.leadVibe)].filter(Boolean).join(' · ');
+  const leading = [s.leadNight ? nightShort(s.leadNight) : null, vibeLabel(s.leadVibe)].filter(Boolean).join(' · ');
   const hot = !amHost && !iVoted;
 
   return (

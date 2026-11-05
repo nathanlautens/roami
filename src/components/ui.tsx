@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -359,6 +360,22 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
         {children}
       </SafeAreaView>
     </Modal>
+  );
+}
+
+/** A record that's gone, or failed to load (with a retry). */
+export function NotFound({ title, error, reload }: { title: string; error: string | null; reload: () => void }) {
+  return (
+    <Screen>
+      <TopBar onBack={() => router.back()} />
+      <H1 style={{ marginTop: 24 }}>{error ? "Couldn't load this one." : title}</H1>
+      {error ? (
+        <View style={{ gap: 12, marginTop: 12 }}>
+          <Body>{error}</Body>
+          <Button variant="dashed" label="Try again" onPress={reload} />
+        </View>
+      ) : null}
+    </Screen>
   );
 }
 

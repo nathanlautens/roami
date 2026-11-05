@@ -6,12 +6,12 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View
 import { PinIcon } from '@/components/icons';
 import { Avatar, Body, Button, Checkbox, Chip, Field, Label, Screen, Tag, TopBar } from '@/components/ui';
 import { useCircles, useFriends } from '@/lib/data';
-import { daysAgo, friendlyError, isStale, PROMPTS, VIBES, WHENS, windowFor, type WhenId } from '@/lib/roams';
-import { celebrateSent } from '@/lib/celebrate';
+import { daysAgo, friendlyError, isStale, longName, PROMPTS, toggled, VIBES, WHENS, windowFor, type WhenId } from '@/lib/roams';
+import { celebrateSent } from '@/lib/signals';
 import { openRoamError } from '@/lib/open-roams';
 import { invalidate } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
-import { useBusy } from '@/lib/use-busy';
+import { busyOnNight, useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Vibe } from '@/lib/types';
 
@@ -40,11 +40,7 @@ export default function SendRoam() {
     mode === 'find' ? new Date(new Date(days[0].iso).getTime() - 19 * 3600_000) : null,
     mode === 'find' ? new Date(new Date(days[13].iso).getTime() + 5 * 3600_000) : null,
   );
-  const busyNight = (iso: string) => {
-    const start = new Date(iso).getTime() - 2 * 3600_000;
-    const end = new Date(iso).getTime() + 5 * 3600_000;
-    return (calBusy ?? []).some((e) => e.start.getTime() < end && e.end.getTime() > start);
-  };
+  const busyNight = (iso: string) => busyOnNight(calBusy, iso).length > 0;
   const [nights, setNights] = useState<Set<string>>(new Set());
   const [buzzerId, setBuzzerId] = useState<string | null>(null);
   const [idea, setIdea] = useState('');
@@ -59,10 +55,7 @@ export default function SendRoam() {
 
   function toggle(set: Set<string>, setter: (s: Set<string>) => void, id: string) {
     Haptics.selectionAsync().catch(() => {});
-    const next = new Set(set);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setter(next);
+    setter(toggled(set, id));
   }
 
   const firstNight = [...nights].sort()[0] ?? null;
@@ -420,8 +413,6 @@ const row = {
 
 // ─── Find a night helpers ───────────────────────────────────────
 
-const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
 /** This week and next, Monday first. Each night starts at 7pm local. */
 function twoWeeks() {
   const now = new Date();
@@ -432,7 +423,7 @@ function twoWeeks() {
       iso: d.toISOString(),
       num: d.getDate(),
       past: d.getTime() <= now.getTime(),
-      label: `${d.getDate()} ${MONTHS_LONG[d.getMonth()]}`,
+      label: `${d.getDate()} ${longName(d, 'month')}`,
     };
   });
 }

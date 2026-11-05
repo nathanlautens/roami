@@ -5,7 +5,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, Tex
 
 import { AddPersonIcon, ClashIcon, MoreIcon, PinIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
-import { Avatar, Body, Button, Checkbox, Chip, H1, Label, Loading, Screen, Sheet, Sticker, Tag, TopBar } from '@/components/ui';
+import { Avatar, Body, Button, Checkbox, Chip, H1, Label, Loading, NotFound, Screen, Sheet, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { findClashes, useFriends, useRoam } from '@/lib/data';
 import {
@@ -56,20 +56,7 @@ export default function RoamScreen() {
 
   if (loading && !data.roam) return <Loading />;
   const roam = data.roam;
-  if (!roam) {
-    return (
-      <Screen>
-        <TopBar onBack={() => router.back()} />
-        <H1 style={{ marginTop: 24 }}>{error ? "Couldn't load this Roam." : 'This Roam has left the chat.'}</H1>
-        {error ? (
-          <View style={{ gap: 12, marginTop: 12 }}>
-            <Body>{error}</Body>
-            <Button variant="dashed" label="Try again" onPress={reload} />
-          </View>
-        ) : null}
-      </Screen>
-    );
-  }
+  if (!roam) return <NotFound error={error} reload={reload} title="This Roam has left the chat." />;
 
   const ins = data.invites.filter((i) => i.response === 'in');
   const mine = data.invites.find((i) => i.user_id === me);

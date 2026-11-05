@@ -4,28 +4,16 @@ import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 
 import { CheckIcon } from '@/components/icons';
-import { Avatar, Body, Button, H1, Label, Loading, Screen, Sticker, Tag, TopBar } from '@/components/ui';
+import { Avatar, Body, Button, H1, Label, Loading, NotFound, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import {
-  buzzerIn,
-  nightDayName,
-  nightLong,
-  openRoamError,
-  standings,
-  useOpenRoam,
-  useTick,
-  vibeName,
-  type OpenRoam,
-} from '@/lib/open-roams';
-import { VIBES } from '@/lib/roams';
+import { buzzerIn, nightDayName, nightLong, openRoamError, standings, useOpenRoam, useTick, type OpenRoam } from '@/lib/open-roams';
+import { DAYS, toggled, vibeLabel, VIBES } from '@/lib/roams';
 import { busyLabel } from '@/lib/calendar';
 import { invalidate } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
-import { useBusy } from '@/lib/use-busy';
+import { busyOnNight, useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Vibe } from '@/lib/types';
-
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function OpenRoamScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -44,20 +32,7 @@ export default function OpenRoamScreen() {
   }, [buzzed, id, reload]);
 
   if (loading && !o) return <Loading />;
-  if (!o) {
-    return (
-      <Screen>
-        <TopBar onBack={() => router.back()} />
-        <H1 style={{ marginTop: 24 }}>{error ? "Couldn't load this one." : 'This vote has left the chat.'}</H1>
-        {error ? (
-          <View style={{ gap: 12, marginTop: 12 }}>
-            <Body>{error}</Body>
-            <Button variant="dashed" label="Try again" onPress={reload} />
-          </View>
-        ) : null}
-      </Screen>
-    );
-  }
+  if (!o) return <NotFound error={error} reload={reload} title="This vote has left the chat." />;
 
   if (o.status !== 'open' || buzzed) return <Result o={o} me={me} />;
   // Remount the voting form when you switch between open Roams.
@@ -89,19 +64,11 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
   const firstNight = o.nights[0] ? new Date(o.nights[0]) : null;
   const lastNight = o.nights.at(-1) ? new Date(new Date(o.nights.at(-1)!).getTime() + 6 * 3600_000) : null;
   const calBusy = useBusy(firstNight ? new Date(firstNight.getTime() - 2 * 3600_000) : null, lastNight);
-  const busyOn = (night: string) => {
-    const start = new Date(night).getTime() - 2 * 3600_000; // from 5pm
-    const end = new Date(night).getTime() + 5 * 3600_000;
-    return (calBusy ?? []).filter((e) => e.start.getTime() < end && e.end.getTime() > start);
-  };
   const profileOf = (uid: string) => o.people.find((p) => p.user_id === uid)?.profile;
 
   function toggle<T>(set: Set<T>, setter: (s: Set<T>) => void, v: T) {
     Haptics.selectionAsync().catch(() => {});
-    const next = new Set(set);
-    if (next.has(v)) next.delete(v);
-    else next.add(v);
-    setter(next);
+    setter(toggled(set, v));
   }
 
   async function save() {
@@ -177,6 +144,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
             const free = s.freeBy.get(n) ?? [];
             const names = free.map((uid) => (uid === me ? 'You' : profileOf(uid)?.display_name ?? '?'));
             const d = new Date(n);
+            const busy = busyOnNight(calBusy, n);
             return (
               <Pressable
                 key={n}
@@ -196,10 +164,10 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
                   <Text numberOfLines={1} style={{ fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.inkSoft }}>
                     {free.length} free{names.length ? ` · ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` +${names.length - 3}` : ''}` : ''}
                   </Text>
-                  {busyOn(n).length ? (
+                  {busy.length ? (
                     <Text numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.violet }}>
-                      📅 You've got {busyLabel(busyOn(n)[0])}
-                      {busyOn(n).length > 1 ? ` +${busyOn(n).length - 1}` : ''}
+                      📅 You've got {busyLabel(busy[0])}
+                      {busy.length > 1 ? ` +${busy.length - 1}` : ''}
                     </Text>
                   ) : null}
                 </View>
@@ -308,7 +276,7 @@ function Result({ o, me }: { o: OpenRoam; me: string }) {
   const night = o.winning_night!;
   const free = new Set(o.nightVotes.filter((v) => new Date(v.night_start).getTime() === new Date(night).getTime()).map((v) => v.user_id));
   free.add(o.host_id);
-  const vibe = vibeName(o.winning_vibe);
+  const vibe = vibeLabel(o.winning_vibe);
 
   return (
     <Screen

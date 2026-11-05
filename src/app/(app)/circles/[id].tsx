@@ -5,6 +5,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { Avatar, Body, Button, Checkbox, Field, H1, Label, Loading, Progress, Screen, TopBar } from '@/components/ui';
 import { useCircles, useFriends } from '@/lib/data';
 import { invalidate } from '@/lib/query';
+import { toggled } from '@/lib/roams';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Circle } from '@/lib/types';
@@ -36,15 +37,6 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
   const [name, setName] = useState(circle?.name ?? '');
   const [picked, setPicked] = useState<Set<string>>(() => new Set(circle?.members.map((m) => m.id) ?? []));
   const [saving, setSaving] = useState(false);
-
-  function toggle(fid: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(fid)) next.delete(fid);
-      else next.add(fid);
-      return next;
-    });
-  }
 
   async function save() {
     const trimmed = name.trim();
@@ -142,7 +134,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
                 key={f.id}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on }}
-                onPress={() => toggle(f.id)}
+                onPress={() => setPicked((prev) => toggled(prev, f.id))}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',

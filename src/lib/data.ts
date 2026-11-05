@@ -107,37 +107,33 @@ export type FeedItem = {
   ins: Invite[]; // everyone who's In (host included), with profiles
 };
 
+const INVITE = 'roam_id, user_id, response, note, responded_at';
+const MY_INVITES = `${INVITE}, roam:roams!inner(*, host:profiles!roams_host_id_fkey(${PROFILE}))`;
+
+/** My invites (from `query`) with everyone who's In on each, in one more query. */
+async function withIns(query: PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<FeedItem[]> {
+  const { data, error } = await query;
+  if (error) throw error;
+  const mine = (data ?? []) as (Invite & { roam: Roam })[];
+  if (!mine.length) return [];
+  const { data: ins, error: insError } = await supabase
+    .from('roam_invites')
+    .select(`${INVITE}, profile:profiles(${PROFILE})`)
+    .in('roam_id', mine.map((m) => m.roam_id))
+    .eq('response', 'in');
+  if (insError) throw insError;
+  const all = (ins ?? []) as unknown as Invite[];
+  return mine.map(({ roam, ...inv }) => ({ roam, mine: inv, ins: all.filter((i) => i.roam_id === inv.roam_id) }));
+}
+
 export function useFeed() {
   const { userId } = useAuth();
   return useLoader<FeedItem[]>(
     ['feed', userId],
-    async () => {
-      if (!userId) return [];
-      const since = new Date().toISOString();
-      const { data: mine, error } = await supabase
-        .from('roam_invites')
-        .select(`roam_id, user_id, response, note, responded_at, roam:roams!inner(*, host:profiles!roams_host_id_fkey(${PROFILE}))`)
-        .eq('user_id', userId)
-        .gt('roam.ends_at', since)
-        .neq('roam.status', 'cancelled');
-      if (error) throw error;
-
-      const ids = (mine ?? []).map((m) => m.roam_id);
-      if (ids.length === 0) return [];
-
-      const { data: ins, error: insError } = await supabase
-        .from('roam_invites')
-        .select(`roam_id, user_id, response, note, responded_at, profile:profiles(${PROFILE})`)
-        .in('roam_id', ids)
-        .eq('response', 'in');
-      if (insError) throw insError;
-
-      return (mine ?? []).map((m) => ({
-        roam: m.roam as unknown as Roam,
-        mine: { roam_id: m.roam_id, user_id: m.user_id, response: m.response, note: m.note, responded_at: m.responded_at },
-        ins: ((ins ?? []) as unknown as Invite[]).filter((i) => i.roam_id === m.roam_id),
-      })) as FeedItem[];
-    },
+    async () =>
+      userId
+        ? withIns(supabase.from('roam_invites').select(MY_INVITES).eq('user_id', userId).gt('roam.ends_at', new Date().toISOString()).neq('roam.status', 'cancelled'))
+        : [],
     [],
     ['roams', 'roam_invites'],
   );
@@ -160,7 +156,7 @@ export function useRoam(id: string) {
         supabase.from('roams').select(`*, host:profiles!roams_host_id_fkey(${PROFILE})`).eq('id', id).maybeSingle(),
         supabase
           .from('roam_invites')
-          .select(`roam_id, user_id, response, note, responded_at, profile:profiles(${PROFILE})`)
+          .select(`${INVITE}, profile:profiles(${PROFILE})`)
           .eq('roam_id', id),
         supabase
           .from('invite_requests')
@@ -199,38 +195,17 @@ export async function findClashes(userId: string, roam: Roam): Promise<Roam[]> {
 /** Roams that are over or were called off, newest first. */
 export function useArchive() {
   const { userId } = useAuth();
-  return useLoader<FeedItem[]>(
-    ['archive', userId],
-    async () => {
-      if (!userId) return [];
-      const now = new Date().toISOString();
-      const { data: mine, error } = await supabase
+  return useLoader<FeedItem[]>(['archive', userId], async () => {
+    if (!userId) return [];
+    const items = await withIns(
+      supabase
         .from('roam_invites')
-        .select(`roam_id, user_id, response, note, responded_at, roam:roams!inner(*, host:profiles!roams_host_id_fkey(${PROFILE}))`)
+        .select(MY_INVITES)
         .eq('user_id', userId)
-        .or(`ends_at.lte.${now},status.eq.cancelled`, { referencedTable: 'roam' })
-        // Newest invites first, so the 200 kept are your latest (not a random 200).
-        .order('invited_at', { ascending: false })
-        .limit(200);
-      if (error) throw error;
-
-      const ids = (mine ?? []).map((m) => m.roam_id);
-      if (!ids.length) return [];
-      const { data: ins, error: insError } = await supabase
-        .from('roam_invites')
-        .select(`roam_id, user_id, response, note, responded_at, profile:profiles(${PROFILE})`)
-        .in('roam_id', ids)
-        .eq('response', 'in');
-      if (insError) throw insError;
-
-      return (mine ?? [])
-        .map((m) => ({
-          roam: m.roam as unknown as Roam,
-          mine: { roam_id: m.roam_id, user_id: m.user_id, response: m.response, note: m.note, responded_at: m.responded_at },
-          ins: ((ins ?? []) as unknown as Invite[]).filter((i) => i.roam_id === m.roam_id),
-        }))
-        .sort((a, b) => b.roam.starts_at.localeCompare(a.roam.starts_at)) as FeedItem[];
-    },
-    [],
-  );
+        .or(`ends_at.lte.${new Date().toISOString()},status.eq.cancelled`, { referencedTable: 'roam' })
+        .order('invited_at', { ascending: false }) // so the 200 kept are your latest
+        .limit(200),
+    );
+    return items.sort((a, b) => b.roam.starts_at.localeCompare(a.roam.starts_at));
+  }, []);
 }

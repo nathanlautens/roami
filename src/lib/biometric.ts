@@ -2,34 +2,20 @@ import * as LocalAuthentication from 'expo-local-authentication';
 
 import { kv } from './storage';
 
-/**
- * Face ID / fingerprint unlock.
- *
- * Your Supabase session stays saved on the phone, so after the first email
- * code you're never asked for email again on this device. When unlock is on,
- * opening the app (or coming back after a while) asks for Face ID,
- * fingerprint, or the phone's passcode as a fallback.
- */
-
+// Face ID / fingerprint unlock. The session stays on the phone after the first email code;
+// with unlock on, opening the app (or returning after a while) asks for Face ID, fingerprint or passcode.
 const KEY = 'roami.biometricUnlock';
 const ASKED_KEY = 'roami.biometricAsked';
 
-const read = kv.get;
-const write = kv.set;
-
-export function isUnlockEnabled() {
-  return read(KEY) === 'on';
-}
+export const isUnlockEnabled = () => kv.get(KEY) === 'on';
+export const wasAskedAboutUnlock = () => kv.get(ASKED_KEY) === '1';
 export function setUnlockEnabled(on: boolean) {
-  write(KEY, on ? 'on' : 'off');
-  write(ASKED_KEY, '1');
-}
-export function wasAskedAboutUnlock() {
-  return read(ASKED_KEY) === '1';
+  kv.set(KEY, on ? 'on' : 'off');
+  kv.set(ASKED_KEY, '1');
 }
 export function clearUnlockPrefs() {
-  write(KEY, null);
-  write(ASKED_KEY, null);
+  kv.set(KEY, null);
+  kv.set(ASKED_KEY, null);
 }
 
 /** What this phone can do: 'face', 'fingerprint', 'passcode' (no biometrics enrolled) or null. */
