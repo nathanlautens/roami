@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from './auth';
 import { PROFILE, useLoader } from './data';
 import { VIBES } from './roams';
+import { kv } from './storage';
 import { supabase } from './supabase';
 import type { Profile, Vibe } from './types';
 
@@ -200,20 +201,12 @@ export async function resolveDue(openRoams: OpenRoam[], now = Date.now()) {
 // Which buzzer results you've already seen (kept on this phone).
 const SEEN_KEY = 'roami.buzzerSeen';
 export function seenBuzzers(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]') as string[]);
-  } catch {
-    return new Set();
-  }
+  return new Set(kv.getJSON<string[]>(SEEN_KEY, []));
 }
 export function markBuzzerSeen(id: string) {
-  try {
-    const s = seenBuzzers();
-    s.add(id);
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...s].slice(-100)));
-  } catch {
-    // best effort
-  }
+  const s = seenBuzzers();
+  s.add(id);
+  kv.setJSON(SEEN_KEY, [...s].slice(-100));
 }
 
 /** Friendly errors from the open Roam functions. */

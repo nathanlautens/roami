@@ -2,6 +2,8 @@ import aesjs from 'aes-js';
 import { getRandomBytes } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
+import { kv } from './storage';
+
 /**
  * Where Supabase keeps your login on the phone.
  *
@@ -34,17 +36,17 @@ function decrypt(keyHex: string, blobHex: string) {
 
 export const secureSessionStorage = {
   async getItem(key: string): Promise<string | null> {
-    const blob = localStorage.getItem(blobName(key));
+    const blob = kv.get(blobName(key));
     if (blob) {
       const k = await SecureStore.getItemAsync(keyName(key), KEYCHAIN);
       // No key (e.g. the app was restored onto a new phone): the blob is useless, sign in again.
       return k ? decrypt(k, blob) : null;
     }
     // Saved unencrypted by an older version: move it into encrypted storage.
-    const legacy = localStorage.getItem(key);
+    const legacy = kv.get(key);
     if (legacy) {
       await secureSessionStorage.setItem(key, legacy);
-      localStorage.removeItem(key);
+      kv.set(key, null);
     }
     return legacy;
   },
@@ -52,12 +54,12 @@ export const secureSessionStorage = {
   async setItem(key: string, value: string): Promise<void> {
     const { key: k, blob } = encrypt(value);
     await SecureStore.setItemAsync(keyName(key), k, KEYCHAIN);
-    localStorage.setItem(blobName(key), blob);
+    kv.set(blobName(key), blob);
   },
 
   async removeItem(key: string): Promise<void> {
-    localStorage.removeItem(blobName(key));
-    localStorage.removeItem(key);
+    kv.set(blobName(key), null);
+    kv.set(key, null);
     await SecureStore.deleteItemAsync(keyName(key), KEYCHAIN);
   },
 };

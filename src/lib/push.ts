@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
+import { kv } from './storage';
 import { supabase } from './supabase';
 
 /**
@@ -94,17 +95,5 @@ export function listenForPushTaps(open: (url: string) => void): () => void {
 }
 
 const HANDLED_KEY = 'roami.lastPushTap';
-function readHandled() {
-  try {
-    return localStorage.getItem(HANDLED_KEY);
-  } catch {
-    return null;
-  }
-}
-function writeHandled(id: string) {
-  try {
-    localStorage.setItem(HANDLED_KEY, id);
-  } catch {
-    // best effort
-  }
-}
+const readHandled = () => kv.get(HANDLED_KEY);
+const writeHandled = (id: string) => kv.set(HANDLED_KEY, id);

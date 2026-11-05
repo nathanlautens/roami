@@ -1,6 +1,7 @@
 import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
+import { kv } from './storage';
 import { supabase } from './supabase';
 
 /**
@@ -36,21 +37,8 @@ type Link = { eventId: string; starts: string; ends: string; what: string; locat
 const PREFS_KEY = 'roami.calendar.prefs';
 const LINKS_KEY = 'roami.calendar.links';
 
-function readJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function writeJSON(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // best effort
-  }
-}
+const readJSON = kv.getJSON;
+const writeJSON = kv.setJSON;
 
 export function calendarPrefs(): Prefs {
   return readJSON<Prefs>(PREFS_KEY, { sync: false, calendarId: null, showPlans: false, asked: false });
