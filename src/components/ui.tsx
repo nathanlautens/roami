@@ -4,6 +4,8 @@ import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Modal,
   Pressable,
   ScrollView,
@@ -28,14 +30,17 @@ export function Screen({
   children,
   footer,
   scroll = true,
+  keyboard,
   style,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   scroll?: boolean;
+  /** Has text inputs: keep them (and the footer) above the iOS keyboard. */
+  keyboard?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  return (
+  const screen = (
     <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
       {scroll ? (
         <ScrollView
@@ -50,6 +55,7 @@ export function Screen({
       {footer ? <View style={s.footer}>{footer}</View> : null}
     </SafeAreaView>
   );
+  return keyboard && Platform.OS === 'ios' ? <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">{screen}</KeyboardAvoidingView> : screen;
 }
 
 export function TopBar({

@@ -10,33 +10,16 @@ import type { Circle, Invite, InviteRequest, Profile, Roam } from './types';
 export const PROFILE = 'id, display_name, avatar_url';
 
 /**
- * Loads data through the shared query cache (see query.ts).
- *
- * `key` identifies the data, so every screen asking for the same key shares
- * one request and one copy. `live` names the tables it reads: realtime marks
- * it stale when they change (see realtime.ts). Screens that aren't focused
- * stop listening and catch up when you come back to them.
+ * Loads through the shared cache (query.ts): screens asking for the same `key` share one request.
+ * `live` names the tables read, so realtime marks it stale when they change (realtime.ts).
+ * Unfocused screens stop listening and catch up when shown again.
  */
 export function useLoader<T>(key: QueryKey, fetcher: () => Promise<T>, initial: T, live: LiveTable[] = []) {
-  const focused = useIsFocused();
   // A stable placeholder, so effects that depend on `data` don't re-run every render while loading.
   const [placeholder] = useState(initial);
-  const query = useQuery({ queryKey: key, queryFn: fetcher, meta: { tables: live }, subscribed: focused });
-  const { refetch } = query;
-  const reload = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
-
-  return {
-    data: query.data ?? placeholder,
-    loading: query.isPending,
-    error: query.error ? errorMessage(query.error) : null,
-    reload,
-  };
-}
-
-function errorMessage(e: unknown) {
-  return (e as { message?: string })?.message ?? String(e);
+  const { data, isPending, error, refetch } = useQuery({ queryKey: key, queryFn: fetcher, meta: { tables: live }, subscribed: useIsFocused() });
+  const reload = useCallback(() => refetch().then(() => {}), [refetch]);
+  return { data: data ?? placeholder, loading: isPending, error: error ? ((error as { message?: string }).message ?? String(error)) : null, reload };
 }
 
 // ─── Friends ────────────────────────────────────────────────────

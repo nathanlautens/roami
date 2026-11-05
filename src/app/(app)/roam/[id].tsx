@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { AddPersonIcon, ClashIcon, MoreIcon, PinIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
@@ -177,8 +177,8 @@ export default function RoamScreen() {
   const notes = ins.filter((i) => i.note);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen>
+    <>
+      <Screen keyboard>
         <TopBar
           onBack={() => router.back()}
           right={
@@ -195,7 +195,7 @@ export default function RoamScreen() {
             </View>
           }
         />
-
+  
         {/* The Roam */}
         <Sticker
           color={state === 'up_for_grabs' ? colors.yellow : amHost ? colors.lime : colors.pink}
@@ -227,7 +227,7 @@ export default function RoamScreen() {
             </Text>
           ) : null}
         </Sticker>
-
+  
         {calBusy && active && myResponse !== 'in' && !amHost ? (
           <Sticker shadow={null} color={calBusy.length ? colors.yellow : colors.white} style={{ marginTop: 18 }} innerStyle={{ padding: 12, gap: 2 }}>
             <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }}>
@@ -240,7 +240,7 @@ export default function RoamScreen() {
             ))}
           </Sticker>
         ) : null}
-
+  
         {state === 'up_for_grabs' ? (
           <Sticker shadow={null} color={colors.white} style={{ marginTop: 18 }} innerStyle={{ padding: 14 }}>
             <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}>
@@ -248,7 +248,7 @@ export default function RoamScreen() {
             </Text>
           </Sticker>
         ) : null}
-
+  
         {/* Who's in */}
         <Label style={{ marginTop: 26 }}>Who's in · {ins.length}</Label>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, marginTop: 10 }}>
@@ -269,7 +269,7 @@ export default function RoamScreen() {
             </View>
           ) : null}
         </ScrollView>
-
+  
         {notes.length ? (
           <View style={{ gap: 8, marginTop: 14 }}>
             {notes.map((i) => (
@@ -281,7 +281,7 @@ export default function RoamScreen() {
             ))}
           </View>
         ) : null}
-
+  
         {/* Host-only view */}
         {amHost && active ? (
           <View style={{ marginTop: 22, gap: 18 }}>
@@ -307,7 +307,7 @@ export default function RoamScreen() {
             <Button variant="dashed" label={busy === 'bail' ? 'One sec…' : "I can't make it anymore"} onPress={() => setBailOpen(true)} />
           </View>
         ) : null}
-
+  
         {/* Up for grabs: anyone who's In can take over */}
         {!amHost && state === 'up_for_grabs' && myResponse === 'in' ? (
           <View style={{ marginTop: 22, gap: 10 }}>
@@ -317,7 +317,7 @@ export default function RoamScreen() {
             <Button variant="link" label="I'm out too" onPress={() => answer('cant')} />
           </View>
         ) : null}
-
+  
         {/* Invitee: answer */}
         {!amHost && active && roam.status === 'live' ? (
           <View style={{ marginTop: 26, gap: 10 }}>
@@ -363,14 +363,14 @@ export default function RoamScreen() {
             />
           </View>
         ) : null}
-
+  
         {!active ? (
           <Body style={{ marginTop: 24 }}>
             {state === 'cancelled' ? 'This one got called off. Rain check?' : state === 'fizzled' ? 'Nobody bit this time. No shame, try again.' : 'That was a good one.'}
           </Body>
         ) : null}
       </Screen>
-
+  
       {/* Double-booked */}
       <Sheet visible={!!clashes} onClose={() => setClashes(null)}>
         <View style={{ alignItems: 'center', marginTop: 6 }}>
@@ -409,7 +409,7 @@ export default function RoamScreen() {
           <Button variant="link" label="I'll try to do both, chaos mode" onPress={() => resolveClash(true)} />
         </View>
       </Sheet>
-
+  
       {/* Host can't make it */}
       <Sheet visible={bailOpen} onClose={() => setBailOpen(false)}>
         <H1 style={{ fontSize: 30, lineHeight: 32 }}>Can't make it?</H1>
@@ -435,7 +435,7 @@ export default function RoamScreen() {
         <Button label={ins.length > 1 ? 'Hand it over' : 'Call it off'} onPress={hostBail} />
         <Button variant="link" label="Actually, I'm still going" onPress={() => setBailOpen(false)} />
       </Sheet>
-
+  
       {/* Bring someone */}
       <Sheet visible={bringOpen} onClose={() => setBringOpen(false)}>
         <H1 style={{ fontSize: 30, lineHeight: 32 }}>Bring someone?</H1>
@@ -464,7 +464,8 @@ export default function RoamScreen() {
         person={amHost ? null : roam.host}
         onBlocked={() => router.back()}
       />
-    </KeyboardAvoidingView>
+  
+    </>
   );
 }
 

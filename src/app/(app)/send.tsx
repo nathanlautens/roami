@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View, type ViewStyle } from 'react-native';
 
 import { PinIcon } from '@/components/icons';
 import { Avatar, Body, Button, Checkbox, Chip, Field, Label, Screen, Tag, TopBar } from '@/components/ui';
@@ -127,277 +127,255 @@ export default function SendRoam() {
           : `Send it to ${n} ${n === 1 ? 'person' : 'people'}`;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen footer={<Button label={cta} onPress={send} loading={sending} disabled={!ready} />}>
-        <TopBar onBack={() => router.back()} close title="New Roam" />
+    <Screen keyboard footer={<Button label={cta} onPress={send} loading={sending} disabled={!ready} />}>
+      <TopBar onBack={() => router.back()} close title="New Roam" />
 
-        <View style={{ flexDirection: 'row', marginTop: 16, borderWidth: border, borderColor: colors.ink, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.white }}>
-          {(
-            [
-              { id: 'now', label: "I'm free now" },
-              { id: 'find', label: 'Find a night' },
-            ] as const
-          ).map((m) => (
-            <Pressable
-              key={m.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: mode === m.id }}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setMode(m.id);
-              }}
-              style={{ flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === m.id ? colors.ink : colors.white }}>
-              <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: mode === m.id ? colors.lime : colors.ink }}>{m.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Label style={{ marginTop: 18 }}>Who's it for?</Label>
-        {friends.friends.length === 0 ? (
-          <View style={{ gap: 10, marginTop: 8 }}>
-            <Body>You need friends on Roami first. Tragic, fixable.</Body>
-            <Button variant="dashed" label="Find your people" onPress={() => router.push('/friends')} />
-          </View>
-        ) : (
-          <View style={{ gap: 8, marginTop: 8 }}>
-            {(() => {
-              const everyone = friends.friends.length > 0 && friends.friends.every((f) => invitees.has(f.id));
-              return (
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: everyone }}
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setPeople(everyone ? new Set() : new Set(friends.friends.map((f) => f.id)));
-                    if (everyone) setCircleIds(new Set());
-                  }}
-                  style={[row, { backgroundColor: everyone ? colors.lime : colors.white }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>Everyone</Text>
-                    <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>All {friends.friends.length} of your friends</Text>
-                  </View>
-                  <Checkbox checked={everyone} />
-                </Pressable>
-              );
-            })()}
-            {circles.map((c) => {
-              const on = circleIds.has(c.id);
-              return (
-                <Pressable
-                  key={c.id}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on }}
-                  onPress={() => toggle(circleIds, setCircleIds, c.id)}
-                  style={[row, { backgroundColor: on ? colors.lime : colors.white }]}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{c.name}</Text>
-                    <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>
-                      {c.members.length} people · {daysAgo(c.lastRoamedAt)}
-                    </Text>
-                  </View>
-                  {isStale(c.lastRoamedAt) && c.members.length ? <Tag label="miss them?" color={colors.pink} dark /> : null}
-                  <Checkbox checked={on} />
-                </Pressable>
-              );
-            })}
-
-            {showPeople ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-                {friends.friends.map((f) => {
-                  const on = invitees.has(f.id);
-                  const viaCircle = on && !people.has(f.id);
-                  return (
-                    <Pressable
-                      key={f.id}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: on }}
-                      onPress={() => !viaCircle && toggle(people, setPeople, f.id)}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingLeft: 4,
-                        paddingRight: 12,
-                        minHeight: 40,
-                        borderRadius: radius.pill,
-                        borderWidth: 2,
-                        borderColor: colors.ink,
-                        backgroundColor: on ? colors.lime : colors.white,
-                        opacity: viaCircle ? 0.6 : 1,
-                      }}>
-                      <Avatar profile={f} size={30} />
-                      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }}>{f.display_name}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : (
-              <Button variant="dashed" label={circles.length ? 'Or pick people one by one' : 'Pick people'} onPress={() => setShowPeople(true)} />
-            )}
-          </View>
-        )}
-
-        {mode === 'find' ? (
-          <>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 22 }}>
-          <Label>Which nights are you free?</Label>
-          <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.violet }}>{nights.size} picked</Text>
-        </View>
-        <View style={{ flexDirection: 'row', marginTop: 10 }}>
-          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-            <Text key={i} style={{ flex: 1, textAlign: 'center', fontFamily: fonts.bodyBold, fontSize: 12, color: colors.inkSoft }}>{d}</Text>
-          ))}
-        </View>
-        {[0, 1].map((week) => (
-          <View key={week} style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-            {days.slice(week * 7, week * 7 + 7).map((d) => {
-              const on = nights.has(d.iso);
-              return (
-                <Pressable
-                  key={d.iso}
-                  disabled={d.past}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on, disabled: d.past }}
-                  accessibilityLabel={`${d.label}${busyNight(d.iso) ? ', you have plans' : ''}`}
-                  onPress={() => toggle(nights, setNights, d.iso)}
-                  style={{
-                    flex: 1,
-                    height: 46,
-                    borderRadius: 12,
-                    borderWidth: d.past ? 2 : border,
-                    borderStyle: d.past ? 'dashed' : 'solid',
-                    borderColor: d.past ? colors.mute : colors.ink,
-                    backgroundColor: d.past ? 'transparent' : on ? colors.pink : colors.white,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <Text style={{ fontFamily: fonts.display, fontSize: 17, color: d.past ? colors.mute : colors.ink }}>{d.num}</Text>
-                  {!d.past && busyNight(d.iso) ? (
-                    <View style={{ position: 'absolute', bottom: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.violet }} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
+      <View style={{ flexDirection: 'row', marginTop: 16, borderWidth: border, borderColor: colors.ink, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.white }}>
+        {(
+          [
+            { id: 'now', label: "I'm free now" },
+            { id: 'find', label: 'Find a night' },
+          ] as const
+        ).map((m) => (
+          <Pressable
+            key={m.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: mode === m.id }}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              setMode(m.id);
+            }}
+            style={{ flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === m.id ? colors.ink : colors.white }}>
+            <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: mode === m.id ? colors.lime : colors.ink }}>{m.label}</Text>
+          </Pressable>
         ))}
+      </View>
 
-        <Label style={{ marginTop: 22 }}>Set the buzzer</Label>
-        {firstNight ? (
-          buzzers.length ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-              {buzzers.map((b) => {
-                const on = buzzer?.id === b.id;
+      <Label style={{ marginTop: 18 }}>Who's it for?</Label>
+      {friends.friends.length === 0 ? (
+        <View style={{ gap: 10, marginTop: 8 }}>
+          <Body>You need friends on Roami first. Tragic, fixable.</Body>
+          <Button variant="dashed" label="Find your people" onPress={() => router.push('/friends')} />
+        </View>
+      ) : (
+        <View style={{ gap: 8, marginTop: 8 }}>
+          {(() => {
+            const everyone = friends.friends.length > 0 && friends.friends.every((f) => invitees.has(f.id));
+            return (
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: everyone }}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setPeople(everyone ? new Set() : new Set(friends.friends.map((f) => f.id)));
+                  if (everyone) setCircleIds(new Set());
+                }}
+                style={[row, { backgroundColor: everyone ? colors.lime : colors.white }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>Everyone</Text>
+                  <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>All {friends.friends.length} of your friends</Text>
+                </View>
+                <Checkbox checked={everyone} />
+              </Pressable>
+            );
+          })()}
+          {circles.map((c) => {
+            const on = circleIds.has(c.id);
+            return (
+              <Pressable
+                key={c.id}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on }}
+                onPress={() => toggle(circleIds, setCircleIds, c.id)}
+                style={[row, { backgroundColor: on ? colors.lime : colors.white }]}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{c.name}</Text>
+                  <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>
+                    {c.members.length} people · {daysAgo(c.lastRoamedAt)}
+                  </Text>
+                </View>
+                {isStale(c.lastRoamedAt) && c.members.length ? <Tag label="miss them?" color={colors.pink} dark /> : null}
+                <Checkbox checked={on} />
+              </Pressable>
+            );
+          })}
+
+          {showPeople ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+              {friends.friends.map((f) => {
+                const on = invitees.has(f.id);
+                const viaCircle = on && !people.has(f.id);
                 return (
                   <Pressable
-                    key={b.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      setBuzzerId(b.id);
-                    }}
-                    style={{ flexBasis: '31%', flexGrow: 1, minHeight: 54, borderRadius: radius.sm, borderWidth: border, borderColor: colors.ink, backgroundColor: on ? colors.yellow : colors.white, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-                    <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }} numberOfLines={1}>{b.label}</Text>
-                    {b.sub ? <Text style={{ fontFamily: fonts.body, fontSize: 11.5, color: colors.inkSoft }}>{b.sub}</Text> : null}
+                    key={f.id}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                    onPress={() => !viaCircle && toggle(people, setPeople, f.id)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingLeft: 4,
+                      paddingRight: 12,
+                      minHeight: 40,
+                      borderRadius: radius.pill,
+                      borderWidth: 2,
+                      borderColor: colors.ink,
+                      backgroundColor: on ? colors.lime : colors.white,
+                      opacity: viaCircle ? 0.6 : 1,
+                    }}>
+                    <Avatar profile={f} size={30} />
+                    <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }}>{f.display_name}</Text>
                   </Pressable>
                 );
               })}
             </View>
           ) : (
-            <Body style={{ marginTop: 8 }}>Your first night is too soon for a vote. Pick later nights, or use I'm free now.</Body>
-          )
-        ) : (
-          <Body style={{ marginTop: 8 }}>Pick your nights first. The buzzer goes off before the first one.</Body>
-        )}
-        {calBusy?.length ? (
-          <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft, marginTop: 8 }}>
-            <Text style={{ color: colors.violet }}>●</Text> = you already have plans that night
-          </Text>
-        ) : null}
-        <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft, marginTop: 8 }}>
-          Everyone votes until then. When it buzzes, the top night locks in.
-        </Text>
+            <Button variant="dashed" label={circles.length ? 'Or pick people one by one' : 'Pick people'} onPress={() => setShowPeople(true)} />
+          )}
+        </View>
+      )}
 
-        <Label style={{ marginTop: 22 }}>Got an idea? (optional)</Label>
-        <View style={{ marginTop: 8 }}>
-          <Field value={idea} onChangeText={setIdea} placeholder="e.g. that new taco place" maxLength={60} accessibilityLabel="Your idea" />
-        </View>
-          </>
-        ) : (
-          <>
-        <Label style={{ marginTop: 22 }}>What's the plan?</Label>
-        <View style={{ marginTop: 8 }}>
-          <Field
-            big
-            multiline
-            value={what}
-            onChangeText={setWhat}
-            placeholder={placeholder}
-            maxLength={80}
-            accessibilityLabel="What's the plan?"
-            style={{ minHeight: 72, textAlignVertical: 'top' }}
-          />
-        </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-          {VIBES.map((v) => (
-            <Chip key={v.id} label={v.label} selected={vibe === v.id} onPress={() => setVibe(vibe === v.id ? null : v.id)} />
-          ))}
-        </View>
-
-        <Label style={{ marginTop: 22 }}>When are you free?</Label>
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
-          {WHENS.map((w) => {
-            const on = when === w.id;
+      {mode === 'find' ? (
+        <>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 22 }}>
+        <Label>Which nights are you free?</Label>
+        <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.violet }}>{nights.size} picked</Text>
+      </View>
+      <View style={{ flexDirection: 'row', marginTop: 10 }}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+          <Text key={i} style={{ flex: 1, textAlign: 'center', fontFamily: fonts.bodyBold, fontSize: 12, color: colors.inkSoft }}>{d}</Text>
+        ))}
+      </View>
+      {[0, 1].map((week) => (
+        <View key={week} style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+          {days.slice(week * 7, week * 7 + 7).map((d) => {
+            const on = nights.has(d.iso);
             return (
               <Pressable
-                key={w.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setWhen(w.id);
-                }}
+                key={d.iso}
+                disabled={d.past}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on, disabled: d.past }}
+                accessibilityLabel={`${d.label}${busyNight(d.iso) ? ', you have plans' : ''}`}
+                onPress={() => toggle(nights, setNights, d.iso)}
                 style={{
                   flex: 1,
-                  minHeight: 56,
-                  borderRadius: radius.sm,
-                  borderWidth: border,
-                  borderColor: colors.ink,
-                  backgroundColor: on ? colors.pink : colors.white,
+                  height: 46,
+                  borderRadius: 12,
+                  borderWidth: d.past ? 2 : border,
+                  borderStyle: d.past ? 'dashed' : 'solid',
+                  borderColor: d.past ? colors.mute : colors.ink,
+                  backgroundColor: d.past ? 'transparent' : on ? colors.pink : colors.white,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  paddingHorizontal: 2,
                 }}>
-                <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }} numberOfLines={1}>{w.label}</Text>
-                <Text style={{ fontFamily: fonts.body, fontSize: 11.5, color: colors.inkSoft }}>{w.sub}</Text>
+                <Text style={{ fontFamily: fonts.display, fontSize: 17, color: d.past ? colors.mute : colors.ink }}>{d.num}</Text>
+                {!d.past && busyNight(d.iso) ? (
+                  <View style={{ position: 'absolute', bottom: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.violet }} />
+                ) : null}
               </Pressable>
             );
           })}
         </View>
+      ))}
 
-        <View style={[row, { marginTop: 10, borderStyle: 'dashed', backgroundColor: 'transparent' }]}>
-          <PinIcon size={18} />
-          <TextInput
-            value={where}
-            onChangeText={setWhere}
-            placeholder="Where? (optional)"
-            placeholderTextColor="#8B82A3"
-            maxLength={80}
-            accessibilityLabel="Where"
-            style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.ink, minHeight: 28 }}
-          />
-        </View>
+      <Label style={{ marginTop: 22 }}>Set the buzzer</Label>
+      {firstNight ? (
+        buzzers.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {buzzers.map((b) => (
+              <Option key={b.id} label={b.label} sub={b.sub} on={buzzer?.id === b.id} color={colors.yellow} onPress={() => setBuzzerId(b.id)} style={{ flexBasis: '31%', flexGrow: 1 }} />
+            ))}
+          </View>
+        ) : (
+          <Body style={{ marginTop: 8 }}>Your first night is too soon for a vote. Pick later nights, or use I'm free now.</Body>
+        )
+      ) : (
+        <Body style={{ marginTop: 8 }}>Pick your nights first. The buzzer goes off before the first one.</Body>
+      )}
+      {calBusy?.length ? (
+        <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft, marginTop: 8 }}>
+          <Text style={{ color: colors.violet }}>●</Text> = you already have plans that night
+        </Text>
+      ) : null}
+      <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft, marginTop: 8 }}>
+        Everyone votes until then. When it buzzes, the top night locks in.
+      </Text>
 
-        <Label style={{ marginTop: 22 }}>Spots</Label>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-          {SPOTS.map((sp) => (
-            <Chip key={String(sp)} label={sp === null ? 'No limit' : `${sp}`} selected={spots === sp} onPress={() => setSpots(sp)} />
-          ))}
-        </View>
-          </>
-        )}
-      </Screen>
-    </KeyboardAvoidingView>
+      <Label style={{ marginTop: 22 }}>Got an idea? (optional)</Label>
+      <View style={{ marginTop: 8 }}>
+        <Field value={idea} onChangeText={setIdea} placeholder="e.g. that new taco place" maxLength={60} accessibilityLabel="Your idea" />
+      </View>
+        </>
+      ) : (
+        <>
+      <Label style={{ marginTop: 22 }}>What's the plan?</Label>
+      <View style={{ marginTop: 8 }}>
+        <Field
+          big
+          multiline
+          value={what}
+          onChangeText={setWhat}
+          placeholder={placeholder}
+          maxLength={80}
+          accessibilityLabel="What's the plan?"
+          style={{ minHeight: 72, textAlignVertical: 'top' }}
+        />
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+        {VIBES.map((v) => (
+          <Chip key={v.id} label={v.label} selected={vibe === v.id} onPress={() => setVibe(vibe === v.id ? null : v.id)} />
+        ))}
+      </View>
+
+      <Label style={{ marginTop: 22 }}>When are you free?</Label>
+      <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+        {WHENS.map((w) => (
+          <Option key={w.id} label={w.label} sub={w.sub} on={when === w.id} color={colors.pink} onPress={() => setWhen(w.id)} style={{ flex: 1 }} />
+        ))}
+      </View>
+
+      <View style={[row, { marginTop: 10, borderStyle: 'dashed', backgroundColor: 'transparent' }]}>
+        <PinIcon size={18} />
+        <TextInput
+          value={where}
+          onChangeText={setWhere}
+          placeholder="Where? (optional)"
+          placeholderTextColor="#8B82A3"
+          maxLength={80}
+          accessibilityLabel="Where"
+          style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.ink, minHeight: 28 }}
+        />
+      </View>
+
+      <Label style={{ marginTop: 22 }}>Spots</Label>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+        {SPOTS.map((sp) => (
+          <Chip key={String(sp)} label={sp === null ? 'No limit' : `${sp}`} selected={spots === sp} onPress={() => setSpots(sp)} />
+        ))}
+      </View>
+        </>
+      )}
+    </Screen>
+
+  );
+}
+
+/** A radio card: a label and a small line under it. */
+function Option({ label, sub, on, color, onPress, style }: { label: string; sub: string; on: boolean; color: string; onPress: () => void; style: ViewStyle }) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ selected: on }}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      style={[{ minHeight: 56, borderRadius: radius.sm, borderWidth: border, borderColor: colors.ink, backgroundColor: on ? color : colors.white, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }, style]}>
+      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }} numberOfLines={1}>{label}</Text>
+      {sub ? <Text style={{ fontFamily: fonts.body, fontSize: 11.5, color: colors.inkSoft }}>{sub}</Text> : null}
+    </Pressable>
   );
 }
 
