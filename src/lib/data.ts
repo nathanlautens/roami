@@ -1,60 +1,42 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, type QueryKey } from '@tanstack/react-query';
+import { useIsFocused } from 'expo-router';
+import { useCallback, useState } from 'react';
 
 import { useAuth } from './auth';
+import type { LiveTable } from './realtime';
 import { supabase } from './supabase';
 import type { Circle, Invite, InviteRequest, Profile, Roam } from './types';
 
 export const PROFILE = 'id, display_name, avatar_url';
 
-/** Re-runs `load` whenever any of these tables change (subject to RLS). */
-function useLive(tables: string[], load: () => void) {
-  const loadRef = useRef(load);
-  useEffect(() => {
-    loadRef.current = load;
-  });
-  const key = tables.join(',');
+/**
+ * Loads data through the shared query cache (see query.ts).
+ *
+ * `key` identifies the data, so every screen asking for the same key shares
+ * one request and one copy. `live` names the tables it reads: realtime marks
+ * it stale when they change (see realtime.ts). Screens that aren't focused
+ * stop listening and catch up when you come back to them.
+ */
+export function useLoader<T>(key: QueryKey, fetcher: () => Promise<T>, initial: T, live: LiveTable[] = []) {
+  const focused = useIsFocused();
+  // A stable placeholder, so effects that depend on `data` don't re-run every render while loading.
+  const [placeholder] = useState(initial);
+  const query = useQuery({ queryKey: key, queryFn: fetcher, meta: { tables: live }, subscribed: focused });
+  const { refetch } = query;
+  const reload = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
-  useEffect(() => {
-    const channel = supabase.channel(`live:${key}:${Math.random().toString(36).slice(2)}`);
-    for (const table of key.split(',')) {
-      channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => loadRef.current());
-    }
-    channel.subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [key]);
+  return {
+    data: query.data ?? placeholder,
+    loading: query.isPending,
+    error: query.error ? errorMessage(query.error) : null,
+    reload,
+  };
 }
 
-export function useLoader<T>(fetcher: () => Promise<T>, initial: T, live: string[] = []) {
-  const [data, setData] = useState<T>(initial);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const fetchRef = useRef(fetcher);
-  useEffect(() => {
-    fetchRef.current = fetcher;
-  });
-
-  const reload = useCallback(async () => {
-    try {
-      setData(await fetchRef.current());
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-    }, [reload]),
-  );
-  useLive(live, reload);
-
-  return { data, loading, error, reload };
+function errorMessage(e: unknown) {
+  return (e as { message?: string })?.message ?? String(e);
 }
 
 // ─── Friends ────────────────────────────────────────────────────
@@ -68,6 +50,7 @@ export type FriendsData = {
 export function useFriends() {
   const { userId } = useAuth();
   return useLoader<FriendsData>(
+    ['friends', userId],
     async () => {
       const { data, error } = await supabase
         .from('friendships')
@@ -94,7 +77,8 @@ export function useFriends() {
 // ─── Circles ──────────────────────────────────────────────────────
 
 export function useCircles() {
-  return useLoader<Circle[]>(async () => {
+  const { userId } = useAuth();
+  return useLoader<Circle[]>(['circles', userId], async () => {
     const [{ data, error }, { data: last }] = await Promise.all([
       supabase
         .from('crews')
@@ -126,6 +110,7 @@ export type FeedItem = {
 export function useFeed() {
   const { userId } = useAuth();
   return useLoader<FeedItem[]>(
+    ['feed', userId],
     async () => {
       if (!userId) return [];
       const since = new Date().toISOString();
@@ -167,7 +152,9 @@ export type RoamDetail = {
 };
 
 export function useRoam(id: string) {
+  const { userId } = useAuth();
   return useLoader<RoamDetail>(
+    ['roam', id, userId],
     async () => {
       const [{ data: roam, error }, { data: invites }, { data: requests }] = await Promise.all([
         supabase.from('roams').select(`*, host:profiles!roams_host_id_fkey(${PROFILE})`).eq('id', id).maybeSingle(),
@@ -213,6 +200,7 @@ export async function findClashes(userId: string, roam: Roam): Promise<Roam[]> {
 export function useArchive() {
   const { userId } = useAuth();
   return useLoader<FeedItem[]>(
+    ['archive', userId],
     async () => {
       if (!userId) return [];
       const now = new Date().toISOString();

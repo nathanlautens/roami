@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
 import { PROFILE } from '@/lib/data';
+import { invalidate } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -37,6 +38,7 @@ export function BlockedList() {
         text: 'Unblock',
         onPress: async () => {
           await supabase.rpc('unblock_user', { p_user: p.id });
+          invalidate('friends');
           load();
         },
       },

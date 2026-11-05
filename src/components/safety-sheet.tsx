@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
+import { invalidate } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -81,6 +82,7 @@ export function SafetySheet({
               Alert.alert("Couldn't block", 'Try again?');
               return;
             }
+            invalidate('circles', 'friends', 'feed');
             close();
             onBlocked?.();
           },

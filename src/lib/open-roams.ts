@@ -1,7 +1,9 @@
+import { useIsFocused } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { useAuth } from './auth';
 import { PROFILE, useLoader } from './data';
+import type { LiveTable } from './realtime';
 import { VIBES } from './roams';
 import { kv } from './storage';
 import { supabase } from './supabase';
@@ -27,6 +29,15 @@ export type OpenRoam = {
 
 const OPEN_FIELDS = `id, host_id, buzzer_at, status, locked_roam_id, winning_night, winning_vibe, winning_idea, created_at,
   host:profiles!open_roams_host_id_fkey(${PROFILE})`;
+
+const OPEN_ROAM_TABLES: LiveTable[] = [
+  'open_roams',
+  'open_roam_invites',
+  'open_roam_night_votes',
+  'open_roam_vibe_votes',
+  'open_roam_ideas',
+  'open_roam_idea_votes',
+];
 
 /** Loads full details for a set of open Roams in a few queries. */
 async function loadDetails(ids: string[]): Promise<OpenRoam[]> {
@@ -65,6 +76,7 @@ async function loadDetails(ids: string[]): Promise<OpenRoam[]> {
 export function useOpenRoams() {
   const { userId } = useAuth();
   return useLoader<OpenRoam[]>(
+    ['openRoams', userId],
     async () => {
       if (!userId) return [];
       const since = new Date(Date.now() - 24 * 3600_000).toISOString();
@@ -77,15 +89,17 @@ export function useOpenRoams() {
       return loadDetails((data ?? []).map((r) => r.open_roam_id));
     },
     [],
-    ['open_roams', 'open_roam_invites', 'open_roam_night_votes', 'open_roam_vibe_votes', 'open_roam_ideas', 'open_roam_idea_votes'],
+    OPEN_ROAM_TABLES,
   );
 }
 
 export function useOpenRoam(id: string) {
+  const { userId } = useAuth();
   return useLoader<OpenRoam | null>(
+    ['openRoam', id, userId],
     async () => (await loadDetails([id]))[0] ?? null,
     null,
-    ['open_roams', 'open_roam_invites', 'open_roam_night_votes', 'open_roam_vibe_votes', 'open_roam_ideas', 'open_roam_idea_votes'],
+    OPEN_ROAM_TABLES,
   );
 }
 
@@ -169,13 +183,20 @@ export function buzzerIn(iso: string, now = Date.now()) {
   return `Buzzer in ${d}d ${h % 24}h`;
 }
 
-/** Re-renders every `ms` so countdowns stay fresh. */
+/** Re-renders every `ms` so countdowns stay fresh. Paused while the screen isn't showing. */
 export function useTick(ms = 30_000) {
+  const focused = useIsFocused();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(t);
-  }, [ms]);
+    if (!focused) return;
+    const tick = () => setNow(Date.now());
+    const catchUp = setTimeout(tick, 0); // back on screen: refresh straight away
+    const t = setInterval(tick, ms);
+    return () => {
+      clearTimeout(catchUp);
+      clearInterval(t);
+    };
+  }, [ms, focused]);
   return now;
 }
 

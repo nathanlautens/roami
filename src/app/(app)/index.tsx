@@ -43,10 +43,20 @@ export default function Feed() {
     });
   }, [opens, tick, reload, reloadOpens]);
 
-  // Keep the phone calendar in step with your Roams.
+  // Keep the phone calendar in step with your Roams. Only what ends up in a calendar
+  // event counts, so someone else answering a Roam doesn't trigger a sync.
+  const calendarKey = useMemo(
+    () =>
+      items
+        .filter((i) => i.mine.response === 'in')
+        .map(({ roam: r }) => [r.id, r.starts_at, r.ends_at, r.what, r.location, r.status].join('~'))
+        .sort()
+        .join('|'),
+    [items],
+  );
   useEffect(() => {
     if (!loading) syncCalendar(me);
-  }, [items, loading, me]);
+  }, [calendarKey, loading, me]);
 
   const buzzing = opens
     .filter((o) => o.status === 'open' && new Date(o.buzzer_at).getTime() > tick)

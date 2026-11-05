@@ -4,6 +4,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 
 import { Avatar, Body, Button, Checkbox, Field, H1, Label, Loading, Progress, Screen, TopBar } from '@/components/ui';
 import { useCircles, useFriends } from '@/lib/data';
+import { invalidate } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Circle } from '@/lib/types';
@@ -77,6 +78,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
         const { error } = await supabase.from('crew_members').delete().eq('crew_id', circleId).in('member_id', removed);
         if (error) throw error;
       }
+      invalidate('circles');
       if (onboarding) router.replace('/');
       else router.back();
     } catch {
@@ -94,6 +96,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
         style: 'destructive',
         onPress: async () => {
           await supabase.from('crews').delete().eq('id', id);
+          invalidate('circles');
           router.back();
         },
       },

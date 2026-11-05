@@ -19,6 +19,7 @@ import {
   vibeLabel,
 } from '@/lib/roams';
 import { busyLabel, calendarAvailable, calendarPrefs, defaultCalendarId, requestCalendarAccess, setCalendarPrefs, syncCalendar } from '@/lib/calendar';
+import { invalidate } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
 import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
@@ -89,6 +90,7 @@ export default function RoamScreen() {
     }
     success?.();
     reload();
+    invalidate('feed');
     syncCalendar(me);
     return true;
   }
@@ -165,6 +167,7 @@ export default function RoamScreen() {
         : 'Nobody was in yet, so it quietly disappears.',
     );
     reload();
+    invalidate('feed');
     syncCalendar(me); // you're out, so it comes off your calendar
   }
 

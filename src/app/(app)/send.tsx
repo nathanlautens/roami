@@ -9,6 +9,7 @@ import { useCircles, useFriends } from '@/lib/data';
 import { daysAgo, friendlyError, isStale, PROMPTS, VIBES, WHENS, windowFor, type WhenId } from '@/lib/roams';
 import { celebrateSent } from '@/lib/celebrate';
 import { openRoamError } from '@/lib/open-roams';
+import { invalidate } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
 import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
@@ -82,6 +83,7 @@ export default function SendRoam() {
       Alert.alert('Not started', openRoamError(error));
       return;
     }
+    invalidate('openRoams');
     celebrateSent({
       what: `${nights.size} ${nights.size === 1 ? 'night' : 'nights'} on the table`,
       count: invitees.size,
@@ -111,6 +113,7 @@ export default function SendRoam() {
       return;
     }
     // Back to home, where the "Roam sent!" celebration plays over the feed.
+    invalidate('feed');
     celebrateSent({ what: what.trim(), count: invitees.size });
     router.dismissTo('/');
   }

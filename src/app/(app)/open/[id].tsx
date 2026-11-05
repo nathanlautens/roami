@@ -19,6 +19,7 @@ import {
 } from '@/lib/open-roams';
 import { VIBES } from '@/lib/roams';
 import { busyLabel } from '@/lib/calendar';
+import { invalidate } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
 import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
@@ -117,6 +118,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
       nights.size ? `We'll buzz you when it's decided. ${buzzerIn(o.buzzer_at, now)}.` : "None of those nights work for you. No stress, there's always next time.",
     );
     reload();
+    invalidate('openRoams');
     router.back();
   }
 
