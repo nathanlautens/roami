@@ -1,9 +1,13 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { Alert, Pressable, Text, View } from 'react-native';
 
-import { Avatar, Body, Button, Checkbox, Field, H1, Label, Loading, Progress, Screen, TopBar } from '@/components/ui';
+import { Avatar, Body, Button, Checkbox, FormField, H1, Label, Loading, Progress, Screen, TopBar } from '@/components/ui';
 import { useCircles, useFriends } from '@/lib/data';
+import { invalidate } from '@/lib/query';
+import { toggled } from '@/lib/roams';
+import { circleSchema } from '@/lib/schemas';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Circle } from '@/lib/types';
@@ -32,59 +36,51 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
   const existing = circle;
   const { data: friends, loading, error: friendsError } = useFriends();
   const friendsLoading = loading || !!friendsError;
-  const [name, setName] = useState(circle?.name ?? '');
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(circle?.members.map((m) => m.id) ?? []));
-  const [saving, setSaving] = useState(false);
+  const { control, handleSubmit, setValue, formState } = useForm({
+    resolver: zodResolver(circleSchema),
+    defaultValues: { name: circle?.name ?? '', members: circle?.members.map((m) => m.id) ?? [] },
+  });
+  const [name, members] = useWatch({ control, name: ['name', 'members'] });
+  const picked = new Set(members);
 
-  function toggle(fid: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(fid)) next.delete(fid);
-      else next.add(fid);
-      return next;
-    });
-  }
+  const save = () =>
+    handleSubmit(async ({ name, members }) => {
+      if (friendsLoading) return; // wait for your friends list, or everyone would look removed
+      try {
+        // Only current friends can be in a circle (someone you've since unfriended is dropped).
+        const friendIds = new Set(friends.friends.map((f) => f.id));
+        const want = members.filter((fid) => friendIds.has(fid));
+        const had = new Set(circle?.members.map((m) => m.id) ?? []);
 
-  async function save() {
-    const trimmed = name.trim();
-    if (!trimmed || friendsLoading) return; // wait for your friends list, or everyone would look removed
-    setSaving(true);
-    try {
-      // Only current friends can be in a circle (someone you've since unfriended is dropped).
-      const friendIds = new Set(friends.friends.map((f) => f.id));
-      const want = [...picked].filter((fid) => friendIds.has(fid));
-      const had = new Set(circle?.members.map((m) => m.id) ?? []);
-
-      let circleId = id;
-      if (isNew) {
-        const { data, error } = await supabase.from('crews').insert({ name: trimmed }).select('id').single();
-        if (error) throw error;
-        circleId = data.id;
-      } else {
-        const { error } = await supabase.from('crews').update({ name: trimmed }).eq('id', id);
-        if (error) throw error;
+        let circleId = id;
+        if (isNew) {
+          const { data, error } = await supabase.from('crews').insert({ name }).select('id').single();
+          if (error) throw error;
+          circleId = data.id;
+        } else {
+          const { error } = await supabase.from('crews').update({ name }).eq('id', id);
+          if (error) throw error;
+        }
+        // Change only who was added or removed, so a failed save can't empty the circle.
+        const added = want.filter((fid) => !had.has(fid));
+        const removed = [...had].filter((fid) => !want.includes(fid));
+        if (added.length) {
+          const { error } = await supabase
+            .from('crew_members')
+            .upsert(added.map((member_id) => ({ crew_id: circleId, member_id })), { ignoreDuplicates: true });
+          if (error) throw error;
+        }
+        if (removed.length) {
+          const { error } = await supabase.from('crew_members').delete().eq('crew_id', circleId).in('member_id', removed);
+          if (error) throw error;
+        }
+        invalidate('circles');
+        if (onboarding) router.replace('/');
+        else router.back();
+      } catch {
+        Alert.alert("Couldn't save the circle", 'Try again?');
       }
-      // Change only who was added or removed, so a failed save can't empty the circle.
-      const added = want.filter((fid) => !had.has(fid));
-      const removed = [...had].filter((fid) => !want.includes(fid));
-      if (added.length) {
-        const { error } = await supabase
-          .from('crew_members')
-          .upsert(added.map((member_id) => ({ crew_id: circleId, member_id })), { ignoreDuplicates: true });
-        if (error) throw error;
-      }
-      if (removed.length) {
-        const { error } = await supabase.from('crew_members').delete().eq('crew_id', circleId).in('member_id', removed);
-        if (error) throw error;
-      }
-      if (onboarding) router.replace('/');
-      else router.back();
-    } catch {
-      Alert.alert("Couldn't save the circle", 'Try again?');
-    } finally {
-      setSaving(false);
-    }
-  }
+    })();
 
   async function remove() {
     Alert.alert(`Delete ${existing?.name}?`, 'Your friends stay your friends. Only the circle goes.', [
@@ -94,6 +90,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
         style: 'destructive',
         onPress: async () => {
           await supabase.from('crews').delete().eq('id', id);
+          invalidate('circles');
           router.back();
         },
       },
@@ -101,7 +98,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
   }
 
   return (
-    <Screen footer={<Button label={isNew ? 'Make it official' : 'Save circle'} onPress={save} loading={saving} disabled={!name.trim() || friendsLoading} />}>
+    <Screen footer={<Button label={isNew ? 'Make it official' : 'Save circle'} onPress={save} loading={formState.isSubmitting} disabled={!name.trim() || friendsLoading} />}>
       <TopBar
         onBack={onboarding ? undefined : () => router.back()}
         right={
@@ -117,7 +114,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
 
       <Label>Circle name</Label>
       <View style={{ marginTop: 8 }}>
-        <Field big value={name} onChangeText={setName} placeholder="Uni lot" maxLength={40} accessibilityLabel="Circle name" />
+        <FormField control={control} name="name" big placeholder="Uni lot" maxLength={40} accessibilityLabel="Circle name" />
       </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, marginBottom: 10 }}>
@@ -139,7 +136,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
                 key={f.id}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on }}
-                onPress={() => toggle(f.id)}
+                onPress={() => setValue('members', [...toggled(picked, f.id)])}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',

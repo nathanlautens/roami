@@ -28,6 +28,7 @@ Do the steps in order. Anything marked ⏳ involves waiting on Apple or Google, 
 3. New query again: paste all of `supabase/migrations/20261016220000_safety_and_push.sql` and **Run**.
 4. New query again: paste all of `supabase/migrations/20261025000000_bug_fixes.sql` and **Run** (fixes from the October code review; safe to run more than once).
 5. New query again: paste all of `supabase/migrations/20261103000000_security_hardening.sql` and **Run** (security fixes: profiles are only visible to people you're connected to, photo checks, rate limits; safe to run more than once).
+6. New query again: paste all of `supabase/migrations/20261105000000_performance_indexes.sql` and **Run** (indexes that keep privacy rules, the every-minute jobs and account deletion fast as you grow; safe to run more than once).
 
 The first file adds "Delete my account", the every-minute buzzer, and locks the test helpers so real users can't create fake friends.
 To use test friends again while testing, run the `grant …` line at the bottom of that file.
@@ -190,12 +191,23 @@ Later updates can be sent automatically with `npx eas-cli@latest submit --platfo
 
 ## 6. Every update after this
 
+There are two kinds of update.
+
+### JavaScript-only changes (most fixes): send over the air, no store review
+```bash
+npx eas-cli@latest update --channel production --message "What changed"
+```
+Phones download it in the background (on launch, or when the app comes back to the foreground) and use it the next time Roami starts. Each build only accepts updates made from the same native code (the `fingerprint` runtime version in `app.json`), so an update can never reach a build it would break. If an update goes wrong, `npx eas-cli@latest update:rollback` puts the previous one back.
+
+Use `--channel preview` to try an update on preview builds first.
+
+### Native changes (new native package, app.json permissions or plugins, SDK upgrade): new build
 ```bash
 npx eas-cli@latest build --platform all --profile production
 npx eas-cli@latest submit --platform ios --latest
 ```
 
-Build numbers go up automatically. New TestFlight builds reach your friends without another review for most updates.
+Build numbers go up automatically. New TestFlight builds reach your friends without another review for most updates. Not sure which kind you need? `npx expo-updates fingerprint:generate` changes when a new build is needed.
 
 ---
 

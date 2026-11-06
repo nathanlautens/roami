@@ -38,9 +38,6 @@ export const PinIcon = (p: Props) => (
     <Circle cx="12" cy="10" r="2.5" />
   </Svg>
 );
-export const HomeIcon = (p: Props) => (
-  <Svg {...base(p)}><Path d="M4 11l8-7 8 7v9H4z" /></Svg>
-);
 export const PeopleIcon = (p: Props) => (
   <Svg {...base({ strokeWidth: 2.2, ...p })}>
     <Circle cx="9" cy="9" r="3.5" />

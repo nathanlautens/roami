@@ -9,6 +9,13 @@ export const VIBES: { id: Vibe; label: string }[] = [
   { id: 'chaos', label: 'Chaos' },
 ];
 
+/** A copy of `set` with `v` added, or removed if it was there. */
+export function toggled<T>(set: Set<T>, v: T) {
+  const next = new Set(set);
+  if (!next.delete(v)) next.add(v);
+  return next;
+}
+
 export function vibeLabel(v: Vibe | null) {
   return VIBES.find((x) => x.id === v)?.label ?? null;
 }
@@ -107,15 +114,15 @@ export function isActive(roam: Roam, now = new Date()) {
   return roam.status !== 'cancelled' && new Date(roam.ends_at) > now;
 }
 
-export function overlaps(a: Roam, b: Roam) {
-  return new Date(a.starts_at) < new Date(b.ends_at) && new Date(b.starts_at) < new Date(a.ends_at);
-}
-
 // ─── Formatting ─────────────────────────────────────────────────
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Full month or weekday name, e.g. longName(d, 'month') = 'November'. */
+export const longName = (d: Date, part: 'month' | 'weekday') => d.toLocaleDateString('en-US', { [part]: 'long' });
 
-function clock(d: Date) {
+/** 7pm, 7:30pm */
+export function clock(d: Date) {
   const h = d.getHours();
   const m = d.getMinutes();
   const suffix = h >= 12 ? 'pm' : 'am';
@@ -189,8 +196,10 @@ const ERRORS: Record<string, string> = {
   invalid_avatar: 'That photo needs uploading again.',
 };
 
-export function friendlyError(e: unknown): string {
+/** A database error in Roami's voice. `extra` messages take priority (e.g. open Roams' own). */
+export function friendlyError(e: unknown, extra: Record<string, string> = {}): string {
   const msg = (e as { message?: string })?.message ?? String(e);
-  const key = Object.keys(ERRORS).find((k) => msg.includes(k));
-  return key ? ERRORS[key] : 'Something went sideways. Try again?';
+  const all = { ...ERRORS, ...extra };
+  const key = Object.keys(all).find((k) => msg.includes(k));
+  return key ? all[key] : 'Something went sideways. Try again?';
 }

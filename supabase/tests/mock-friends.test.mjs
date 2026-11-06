@@ -1,43 +1,11 @@
-// Checks the mock-friends seed. Run: npm run test:mock
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+// Checks the mock-friends seed. Run: node supabase/tests/mock-friends.test.mjs
+import { harness } from './harness.mjs';
 
-const db = new PGlite();
-await db.exec(`
-  create role anon; create role authenticated;
-  grant usage on schema public to anon, authenticated;
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  create schema auth;
-  create table auth.users (
-    id uuid primary key, phone text, aud text, role text,
-    created_at timestamptz, updated_at timestamptz, is_anonymous boolean not null default false
-  );
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
-  create publication supabase_realtime;
-  create schema storage;
-  create table storage.buckets (id text primary key, name text, public boolean);
-  create table storage.objects (bucket_id text, name text);
-  create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
-  alter table storage.objects enable row level security;
-`);
-await db.exec(readFileSync('supabase/migrations/20261014200000_initial_schema.sql', 'utf8'));
-await db.exec(readFileSync('supabase/migrations/20261014230000_mock_friends.sql', 'utf8'));
+const { db, check, as, users, done } = await harness(['20261014200000_initial_schema', '20261014230000_mock_friends']);
 
 const ME = '00000000-0000-0000-0000-0000000000aa';
 const OTHER = '00000000-0000-0000-0000-0000000000bb';
-await db.exec(`insert into auth.users (id) values ('${ME}'), ('${OTHER}');
-  update public.profiles set display_name = 'Nate' where id = '${ME}';
-  update public.profiles set display_name = 'Someone' where id = '${OTHER}';`);
-
-async function as(user, sql) {
-  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${user}', false); set role authenticated;`);
-  try { return await db.query(sql); } finally { await db.exec('reset role;'); }
-}
-let failures = 0;
-const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failures++; };
+await users({ [ME]: 'Nate', [OTHER]: 'Someone' });
 
 check('seed creates 10 friends', (await as(ME, 'select public.seed_mock_friends() n')).rows[0].n === 10);
 
@@ -79,5 +47,4 @@ check('circles stay', (await as(ME, 'select count(*)::int n from public.crews'))
 check('can seed again after clearing', (await as(ME, 'select public.seed_mock_friends() n')).rows[0].n === 10);
 check('re-seeding reuses the same 2 circles', (await as(ME, 'select count(*)::int n from public.crews')).rows[0].n === 2);
 
-console.log(failures ? `\n${failures} FAILED` : '\nall checks passed');
-process.exit(failures ? 1 : 0);
+done();

@@ -1,20 +1,24 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { Alert, Pressable, Text, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { pickAndUploadAvatar, removeOldPhotos } from '@/lib/avatar';
+import { profileSchema } from '@/lib/schemas';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts } from '@/lib/theme';
 import { CameraIcon, PlusIcon } from './icons';
-import { Avatar, Button, Field, Label, Sticker } from './ui';
+import { Avatar, Button, FormField, Label, Sticker } from './ui';
 
-/** Photo + display name. Used in onboarding and on the profile screen. */
 export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => void }) {
   const { userId, profile, refreshProfile } = useAuth();
-  const [name, setName] = useState(profile?.display_name ?? '');
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? null);
+  const { control, handleSubmit, setValue, formState } = useForm({
+    resolver: zodResolver(profileSchema),
+    defaultValues: { displayName: profile?.display_name ?? '', avatarUrl: profile?.avatar_url ?? null },
+  });
+  const [name, avatarUrl] = useWatch({ control, name: ['displayName', 'avatarUrl'] });
   const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   const preview = { id: userId ?? 'me', display_name: name || '?', avatar_url: avatarUrl };
 
@@ -23,7 +27,7 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
     try {
       setUploading(true);
       const url = await pickAndUploadAvatar(userId);
-      if (url) setAvatarUrl(url);
+      if (url) setValue('avatarUrl', url);
     } catch (e) {
       const reason = (e as { message?: string })?.message;
       Alert.alert("Couldn't upload that", reason ? `Try a different photo? (${reason})` : 'Try a different photo?');
@@ -32,23 +36,15 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
     }
   }
 
-  async function save() {
-    const trimmed = name.trim();
-    if (!userId || !trimmed) return;
-    setSaving(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ display_name: trimmed.slice(0, 30), avatar_url: avatarUrl })
-      .eq('id', userId);
-    setSaving(false);
-    if (error) {
-      Alert.alert("Couldn't save", 'Something went sideways. Try again?');
-      return;
-    }
-    await refreshProfile();
-    removeOldPhotos(userId, avatarUrl).catch(() => {});
-    onSaved?.();
-  }
+  const save = () =>
+    handleSubmit(async ({ displayName, avatarUrl }) => {
+      if (!userId) return;
+      const { error } = await supabase.from('profiles').update({ display_name: displayName, avatar_url: avatarUrl }).eq('id', userId);
+      if (error) return Alert.alert("Couldn't save", 'Something went sideways. Try again?');
+      await refreshProfile();
+      removeOldPhotos(userId, avatarUrl).catch(() => {});
+      onSaved?.();
+    })();
 
   return (
     <View style={{ flex: 1 }}>
@@ -99,10 +95,10 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
 
       <Label>Display name</Label>
       <View style={{ marginTop: 8 }}>
-        <Field
+        <FormField
+          control={control}
+          name="displayName"
           big
-          value={name}
-          onChangeText={setName}
           placeholder="What do your friends call you?"
           maxLength={30}
           autoCapitalize="words"
@@ -125,7 +121,7 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
       </Sticker>
 
       <View style={{ marginTop: 'auto', paddingTop: 24 }}>
-        <Button label={cta} onPress={save} loading={saving} disabled={!name.trim() || uploading} />
+        <Button label={cta} onPress={save} loading={formState.isSubmitting} disabled={!name.trim() || uploading} />
       </View>
     </View>
   );

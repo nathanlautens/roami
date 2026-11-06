@@ -22,17 +22,9 @@ export function useBusy(start: Date | null, end: Date | null) {
   return events;
 }
 
-/** Groups busy events by local day key "YYYY-MM-DD". */
-export function byDay(events: BusyEvent[] | null) {
-  const out = new Map<string, BusyEvent[]>();
-  for (const ev of events ?? []) {
-    const d = ev.start;
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    out.set(key, [...(out.get(key) ?? []), ev]);
-  }
-  return out;
-}
-
-export function dayKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** Your events on a night (from 5pm, 2h before the 7pm start, until midnight). */
+export function busyOnNight(events: BusyEvent[] | null, nightIso: string) {
+  const start = new Date(nightIso).getTime() - 2 * 3600_000;
+  const end = start + 7 * 3600_000;
+  return (events ?? []).filter((e) => e.start.getTime() < end && e.end.getTime() > start);
 }

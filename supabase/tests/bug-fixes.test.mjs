@@ -1,55 +1,13 @@
-// Checks the fixes from the October code review. Run: npm run test:fixes
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+// Checks the fixes from the October code review. Run: node supabase/tests/bug-fixes.test.mjs
+import { harness, migration } from './harness.mjs';
 
-const db = new PGlite();
-await db.exec(`
-  create role anon; create role authenticated;
-  grant usage on schema public to anon, authenticated;
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  create schema auth;
-  create table auth.users (
-    id uuid primary key, phone text, aud text, role text,
-    created_at timestamptz, updated_at timestamptz, is_anonymous boolean not null default false
-  );
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
-  create publication supabase_realtime;
-  create schema storage;
-  create table storage.buckets (id text primary key, name text, public boolean);
-  create table storage.objects (bucket_id text, name text);
-  create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
-  alter table storage.objects enable row level security;
-`);
-for (const f of ['20261014200000_initial_schema', '20261014230000_mock_friends', '20261015000000_open_roams',
-  '20261016210000_release_ready', '20261016220000_safety_and_push', '20261025000000_bug_fixes']) {
-  await db.exec(readFileSync(`supabase/migrations/${f}.sql`, 'utf8'));
-}
-
+const { db, check, as, expectError, users, one, done } = await harness(['20261014200000_initial_schema', '20261014230000_mock_friends', '20261015000000_open_roams', '20261016210000_release_ready', '20261016220000_safety_and_push', '20261025000000_bug_fixes']);
 
 const A = '00000000-0000-0000-0000-00000000000a'; // Nate
 const B = '00000000-0000-0000-0000-00000000000b'; // Jo
 const C = '00000000-0000-0000-0000-00000000000c'; // Sam
 const D = '00000000-0000-0000-0000-00000000000d'; // Dee
-await db.exec(`insert into auth.users (id) values ('${A}'), ('${B}'), ('${C}'), ('${D}');
-  update public.profiles set display_name = 'Nate' where id = '${A}';
-  update public.profiles set display_name = 'Jo' where id = '${B}';
-  update public.profiles set display_name = 'Sam' where id = '${C}';
-  update public.profiles set display_name = 'Dee' where id = '${D}';`);
-
-async function as(user, sql) {
-  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${user}', false); set role authenticated;`);
-  try { return await db.query(sql); } finally { await db.exec('reset role;'); }
-}
-let failures = 0;
-const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failures++; };
-async function expectError(name, user, sql, code) {
-  try { await as(user, sql); check(name, false); }
-  catch (e) { check(name, e.message.includes(code)); if (!e.message.includes(code)) console.log('   got:', e.message); }
-}
-const one = async (sql) => (await db.query(sql)).rows[0];
+await users({ [A]: 'Nate', [B]: 'Jo', [C]: 'Sam', [D]: 'Dee' });
 
 // Everyone is friends with Nate; Jo and Sam are friends too.
 for (const [x, y] of [[A, B], [A, C], [A, D], [B, C]]) {
@@ -127,8 +85,7 @@ await expectError("can't edit a called-off Roam", A,
   `select public.update_roam('${roam}', 'Pub quiz', null, now() + interval '1 hour', now() + interval '2 hours')`, 'roam_over');
 
 // Running the file twice is safe
-await db.exec(readFileSync('supabase/migrations/20261025000000_bug_fixes.sql', 'utf8'));
+await db.exec(migration('20261025000000_bug_fixes'));
 check('the fix file can be run again', true);
 
-console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
-process.exit(failures ? 1 : 0);
+done();

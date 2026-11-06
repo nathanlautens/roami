@@ -1,8 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import type { ReactNode } from 'react';
+import { router } from 'expo-router';
+import type { ComponentType, ReactNode } from 'react';
+import { Controller, type Control, type FieldValues, type Path } from 'react-hook-form';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Modal,
   Pressable,
   ScrollView,
@@ -21,20 +25,21 @@ import { avatarColors, border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
 import { BackIcon, CheckIcon, CloseIcon } from './icons';
 
-// ─── Layout ─────────────────────────────────────────────────────
-
 export function Screen({
   children,
   footer,
   scroll = true,
+  keyboard,
   style,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   scroll?: boolean;
+  /** Has text inputs: keep them (and the footer) above the iOS keyboard. */
+  keyboard?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  return (
+  const screen = (
     <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
       {scroll ? (
         <ScrollView
@@ -49,6 +54,7 @@ export function Screen({
       {footer ? <View style={s.footer}>{footer}</View> : null}
     </SafeAreaView>
   );
+  return keyboard && Platform.OS === 'ios' ? <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">{screen}</KeyboardAvoidingView> : screen;
 }
 
 export function TopBar({
@@ -95,8 +101,6 @@ export function Progress({ step, of }: { step: number; of: number }) {
   );
 }
 
-// ─── Type ───────────────────────────────────────────────────────
-
 export function H1({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[s.h1, style]}>{children}</Text>;
 }
@@ -106,8 +110,6 @@ export function Body({ children, style }: { children: ReactNode; style?: StylePr
 export function Label({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[s.label, style]}>{children}</Text>;
 }
-
-// ─── Sticker: a card with a hard offset shadow ──────────────────
 
 export function Sticker({
   children,
@@ -158,8 +160,6 @@ export function Sticker({
     </View>
   );
 }
-
-// ─── Buttons ────────────────────────────────────────────────────
 
 export function Button({
   label,
@@ -284,8 +284,6 @@ export function Checkbox({ checked, round }: { checked: boolean; round?: boolean
   );
 }
 
-// ─── Inputs ─────────────────────────────────────────────────────
-
 export function Field({ big, style, ...props }: TextInputProps & { big?: boolean }) {
   return (
     <Sticker shadow={colors.lime} offset={4} rounded={radius.md}>
@@ -298,7 +296,34 @@ export function Field({ big, style, ...props }: TextInputProps & { big?: boolean
   );
 }
 
-// ─── People ─────────────────────────────────────────────────────
+export function FormField<T extends FieldValues>({
+  control,
+  name,
+  input: Input = Field,
+  onChangeText,
+  ...props
+}: { control: Control<T>; name: Path<T>; input?: ComponentType<TextInputProps & { big?: boolean }> } & TextInputProps & { big?: boolean }) {
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field, fieldState: { error } }) => (
+        <View style={{ gap: 6 }}>
+          <Input
+            {...props}
+            value={field.value}
+            onBlur={field.onBlur}
+            onChangeText={(t) => {
+              field.onChange(t);
+              onChangeText?.(t);
+            }}
+          />
+          {error?.message ? <Text style={s.error}>{error.message}</Text> : null}
+        </View>
+      )}
+    />
+  );
+}
 
 function colorFor(id: string) {
   let h = 0;
@@ -348,8 +373,6 @@ export function namesIn(people: (Profile | null | undefined)[], me?: string | nu
   return `${names[0]} and ${names.length - 1} others are in`;
 }
 
-// ─── Sheet ──────────────────────────────────────────────────────
-
 export function Sheet({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: ReactNode }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -362,6 +385,21 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
   );
 }
 
+export function NotFound({ title, error, reload }: { title: string; error: string | null; reload: () => void }) {
+  return (
+    <Screen>
+      <TopBar onBack={() => router.back()} />
+      <H1 style={{ marginTop: 24 }}>{error ? "Couldn't load this one." : title}</H1>
+      {error ? (
+        <View style={{ gap: 12, marginTop: 12 }}>
+          <Body>{error}</Body>
+          <Button variant="dashed" label="Try again" onPress={reload} />
+        </View>
+      ) : null}
+    </Screen>
+  );
+}
+
 export function Loading() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
@@ -369,8 +407,6 @@ export function Loading() {
     </View>
   );
 }
-
-// ─── Styles ─────────────────────────────────────────────────────
 
 export const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ground },
@@ -467,6 +503,7 @@ export const s = StyleSheet.create({
     color: colors.ink,
   },
   fieldBig: { fontFamily: fonts.displayBold, fontSize: 22, lineHeight: 26 },
+  error: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.violet },
   scrim: { flex: 1, backgroundColor: colors.dim },
   sheet: {
     backgroundColor: colors.ground,

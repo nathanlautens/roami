@@ -1,8 +1,11 @@
+import { useIsFocused } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { useAuth } from './auth';
 import { PROFILE, useLoader } from './data';
-import { VIBES } from './roams';
+import type { LiveTable } from './realtime';
+import { DAYS, friendlyError, longName, MONTHS } from './roams';
+import { kv } from './storage';
 import { supabase } from './supabase';
 import type { Profile, Vibe } from './types';
 
@@ -26,6 +29,15 @@ export type OpenRoam = {
 
 const OPEN_FIELDS = `id, host_id, buzzer_at, status, locked_roam_id, winning_night, winning_vibe, winning_idea, created_at,
   host:profiles!open_roams_host_id_fkey(${PROFILE})`;
+
+const OPEN_ROAM_TABLES: LiveTable[] = [
+  'open_roams',
+  'open_roam_invites',
+  'open_roam_night_votes',
+  'open_roam_vibe_votes',
+  'open_roam_ideas',
+  'open_roam_idea_votes',
+];
 
 /** Loads full details for a set of open Roams in a few queries. */
 async function loadDetails(ids: string[]): Promise<OpenRoam[]> {
@@ -64,6 +76,7 @@ async function loadDetails(ids: string[]): Promise<OpenRoam[]> {
 export function useOpenRoams() {
   const { userId } = useAuth();
   return useLoader<OpenRoam[]>(
+    ['openRoams', userId],
     async () => {
       if (!userId) return [];
       const since = new Date(Date.now() - 24 * 3600_000).toISOString();
@@ -76,15 +89,17 @@ export function useOpenRoams() {
       return loadDetails((data ?? []).map((r) => r.open_roam_id));
     },
     [],
-    ['open_roams', 'open_roam_invites', 'open_roam_night_votes', 'open_roam_vibe_votes', 'open_roam_ideas', 'open_roam_idea_votes'],
+    OPEN_ROAM_TABLES,
   );
 }
 
 export function useOpenRoam(id: string) {
+  const { userId } = useAuth();
   return useLoader<OpenRoam | null>(
+    ['openRoam', id, userId],
     async () => (await loadDetails([id]))[0] ?? null,
     null,
-    ['open_roams', 'open_roam_invites', 'open_roam_night_votes', 'open_roam_vibe_votes', 'open_roam_ideas', 'open_roam_idea_votes'],
+    OPEN_ROAM_TABLES,
   );
 }
 
@@ -138,10 +153,6 @@ export function standings(o: OpenRoam): Standings {
 
 // ─── Formatting ─────────────────────────────────────────────────
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const LONG_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export function nightShort(iso: string) {
   const d = new Date(iso);
   return `${DAYS[d.getDay()]} ${d.getDate()}`;
@@ -150,12 +161,7 @@ export function nightLong(iso: string) {
   const d = new Date(iso);
   return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
-export function nightDayName(iso: string) {
-  return LONG_DAYS[new Date(iso).getDay()];
-}
-export function vibeName(v: Vibe | null) {
-  return VIBES.find((x) => x.id === v)?.label ?? null;
-}
+export const nightDayName = (iso: string) => longName(new Date(iso), 'weekday');
 
 export function buzzerIn(iso: string, now = Date.now()) {
   const ms = new Date(iso).getTime() - now;
@@ -168,21 +174,23 @@ export function buzzerIn(iso: string, now = Date.now()) {
   return `Buzzer in ${d}d ${h % 24}h`;
 }
 
-/** Re-renders every `ms` so countdowns stay fresh. */
+/** Re-renders every `ms` so countdowns stay fresh. Paused while the screen isn't showing. */
 export function useTick(ms = 30_000) {
+  const focused = useIsFocused();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(t);
-  }, [ms]);
+    if (!focused) return;
+    const tick = () => setNow(Date.now());
+    const catchUp = setTimeout(tick, 0); // back on screen: refresh straight away
+    const t = setInterval(tick, ms);
+    return () => {
+      clearTimeout(catchUp);
+      clearInterval(t);
+    };
+  }, [ms, focused]);
   return now;
 }
 
-/** "Jo, Priya +2" */
-export function namesShort(people: (Profile | null | undefined)[], me?: string | null, max = 3) {
-  const names = people.map((p) => (p?.id === me ? 'You' : p?.display_name ?? '?'));
-  return names.slice(0, max).join(', ') + (names.length > max ? ` +${names.length - max}` : '');
-}
 
 // ─── The buzzer ─────────────────────────────────────────────────
 
@@ -200,24 +208,16 @@ export async function resolveDue(openRoams: OpenRoam[], now = Date.now()) {
 // Which buzzer results you've already seen (kept on this phone).
 const SEEN_KEY = 'roami.buzzerSeen';
 export function seenBuzzers(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]') as string[]);
-  } catch {
-    return new Set();
-  }
+  return new Set(kv.getJSON<string[]>(SEEN_KEY, []));
 }
 export function markBuzzerSeen(id: string) {
-  try {
-    const s = seenBuzzers();
-    s.add(id);
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...s].slice(-100)));
-  } catch {
-    // best effort
-  }
+  const s = seenBuzzers();
+  s.add(id);
+  kv.setJSON(SEEN_KEY, [...s].slice(-100));
 }
 
 /** Friendly errors from the open Roam functions. */
-const ERRORS: Record<string, string> = {
+const ERRORS = {
   no_nights: 'Pick at least one night.',
   too_many_nights: 'Seven nights max. Commitment issues?',
   night_in_past: "One of those nights has already happened.",
@@ -230,8 +230,4 @@ const ERRORS: Record<string, string> = {
   too_many_ideas: "That's 3 ideas from you. Let someone else cook.",
   load_test_friends_first: 'Load test friends first.',
 };
-export function openRoamError(e: unknown) {
-  const msg = (e as { message?: string })?.message ?? String(e);
-  const key = Object.keys(ERRORS).find((k) => msg.includes(k));
-  return key ? ERRORS[key] : 'Something went sideways. Try again?';
-}
+export const openRoamError = (e: unknown) => friendlyError(e, ERRORS);

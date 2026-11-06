@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, Text, useWindowDimensions, View } from 'react-native';
 
-import { clearCelebration, useCelebration } from '@/lib/celebrate';
+import { clearCelebration, useCelebration } from '@/lib/signals';
 import { colors, fonts } from '@/lib/theme';
 import { Sticker } from './ui';
 
