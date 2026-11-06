@@ -1,10 +1,11 @@
-import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { haptic } from '@/lib/haptics';
 import { displayName } from '@/lib/format';
 import { avatarColors, border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -31,14 +33,17 @@ export function Screen({
   children,
   footer,
   scroll = true,
+  keyboard,
   style,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   scroll?: boolean;
+  /** Lifts the footer above the keyboard (iOS), for screens with text inputs. */
+  keyboard?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  return (
+  const screen = (
     <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
       {scroll ? (
         <ScrollView
@@ -52,6 +57,12 @@ export function Screen({
       )}
       {footer ? <View style={s.footer}>{footer}</View> : null}
     </SafeAreaView>
+  );
+  if (!keyboard) return screen;
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {screen}
+    </KeyboardAvoidingView>
   );
 }
 
@@ -215,7 +226,7 @@ export function Button({
   const inactive = disabled || loading;
   const press = () => {
     if (inactive) return;
-    if (variant === 'primary') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (variant === 'primary') haptic.press();
     onPress();
   };
 
@@ -284,7 +295,7 @@ export function Chip({
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
       onPress={() => {
-        Haptics.selectionAsync().catch(() => {});
+        haptic.select();
         onPress();
       }}
       style={[s.chip, { backgroundColor: selected ? selectedColor : colors.white }]}>
@@ -313,7 +324,7 @@ export function SelectTile({
   selectedColor = colors.lime,
   color = colors.white,
   rounded = radius.md,
-  haptic,
+  haptic: withHaptic,
   disabled,
   accessibilityLabel,
   style,
@@ -338,7 +349,7 @@ export function SelectTile({
       accessibilityLabel={accessibilityLabel}
       disabled={disabled}
       onPress={() => {
-        if (haptic) Haptics.selectionAsync().catch(() => {});
+        if (withHaptic) haptic.select();
         onPress();
       }}
       style={[

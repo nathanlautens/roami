@@ -20,13 +20,14 @@ import {
 import { removeAllRoamiEvents, setCalendarPrefs } from '@/lib/calendar';
 import { SKIP_LOGIN } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
+import { useAction } from '@/lib/use-action';
 import { colors, fonts } from '@/lib/theme';
 
 export default function ProfileScreen() {
   const { signOut, session, userId } = useAuth();
   const [kind, setKind] = useState<UnlockKind>(null);
   const [unlock, setUnlock] = useState(isUnlockEnabled());
-  const [deleting, setDeleting] = useState(false);
+  const [deleting, run] = useAction();
 
   useEffect(() => {
     unlockKind().then(setKind);
@@ -64,11 +65,11 @@ export default function ProfileScreen() {
           text: 'Delete forever',
           style: 'destructive',
           onPress: async () => {
-            setDeleting(true);
-            // Photos first (storage files can only be removed through the Storage API).
-            if (userId) await removePhotos(userId);
-            const { error } = await supabase.rpc('delete_my_account');
-            setDeleting(false);
+            const { error } = await run('delete', async () => {
+              // Photos first (storage files can only be removed through the Storage API).
+              if (userId) await removePhotos(userId);
+              return supabase.rpc('delete_my_account');
+            });
             if (error) {
               Alert.alert("Couldn't delete your account", 'Try again, or email admin@roami.com and we\'ll do it for you.');
               return;

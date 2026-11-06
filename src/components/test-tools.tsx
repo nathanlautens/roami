@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { useAction } from '@/lib/use-action';
 import { Button, Label, Sticker } from './ui';
 
 /**
@@ -10,13 +10,11 @@ import { Button, Label, Sticker } from './ui';
  * real build. Needs supabase/migrations/20261014230000_mock_friends.sql.
  */
 export function TestTools({ onChange }: { onChange?: () => void }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, run] = useAction();
   if (!__DEV__) return null;
 
   async function load() {
-    setBusy(true);
-    const { data, error } = await supabase.rpc('seed_mock_friends');
-    setBusy(false);
+    const { data, error } = await run('load', () => supabase.rpc('seed_mock_friends'));
     if (error) {
       Alert.alert(
         "Couldn't load test friends",
@@ -36,9 +34,7 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
   }
 
   async function testVote() {
-    setBusy(true);
-    const { error } = await supabase.rpc('seed_mock_open_roam');
-    setBusy(false);
+    const { error } = await run('vote', () => supabase.rpc('seed_mock_open_roam'));
     if (error) {
       Alert.alert(
         "Couldn't start a test vote",
@@ -64,9 +60,7 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          setBusy(true);
-          const { data, error } = await supabase.rpc('clear_mock_friends');
-          setBusy(false);
+          const { data, error } = await run('clear', () => supabase.rpc('clear_mock_friends'));
           if (error) Alert.alert('Hmm', error.message);
           else Alert.alert(`Removed ${data} test friends`);
           onChange?.();

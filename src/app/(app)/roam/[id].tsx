@@ -1,7 +1,6 @@
-import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AddPersonIcon, ClashIcon, MoreIcon, PinIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
@@ -25,6 +24,7 @@ import {
   Tag,
   TopBar,
 } from '@/components/ui';
+import { haptic } from '@/lib/haptics';
 import { alertError } from '@/lib/alerts';
 import { useAuth } from '@/lib/auth';
 import { findClashes, useFriends, useRoam } from '@/lib/data';
@@ -48,6 +48,7 @@ import {
   useCalendarBusy,
 } from '@/lib/calendar';
 import { supabase } from '@/lib/supabase';
+import { useAction } from '@/lib/use-action';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Response, Roam } from '@/lib/types';
 
@@ -67,7 +68,7 @@ export default function RoamScreen() {
   const { data: friends } = useFriends();
 
   const [note, setNote] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, track] = useAction();
   const [clashes, setClashes] = useState<Roam[] | null>(null);
   const [skip, setSkip] = useState<string | null>(null);
   const [bailOpen, setBailOpen] = useState(false);
@@ -95,10 +96,9 @@ export default function RoamScreen() {
   const vibe = vibeLabel(roam.vibe);
   const noteValue = note ?? mine?.note ?? '';
 
+  /** Runs a database call, then shows any error or refreshes the Roam (and your calendar). */
   async function run(key: string, fn: () => PromiseLike<{ error: unknown }>, success?: () => void) {
-    setBusy(key);
-    const { error } = await fn();
-    setBusy(null);
+    const { error } = await track(key, fn);
     if (error) {
       alertError(error);
       return false;
@@ -114,11 +114,9 @@ export default function RoamScreen() {
 
   async function answer(response: Response) {
     if (busy) return; // one answer at a time
-    Haptics.selectionAsync().catch(() => {});
+    haptic.select();
     if (response === 'in' && myResponse !== 'in') {
-      setBusy(response);
-      const found = await findClashes(me, roam!);
-      setBusy(null);
+      const found = await track(response, () => findClashes(me, roam!));
       if (found.length) {
         setClashes(found);
         setSkip(found[0].id);
@@ -127,7 +125,7 @@ export default function RoamScreen() {
     }
     const ok = await respond(response);
     if (ok && response === 'in') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      haptic.success();
       offerCalendar();
     }
   }
@@ -167,9 +165,9 @@ export default function RoamScreen() {
 
   async function hostBail() {
     setBailOpen(false);
-    setBusy('bail');
-    const { data: status, error } = await supabase.rpc('host_cant_make_it', { p_roam: roam!.id, p_note: bailNote || null });
-    setBusy(null);
+    const { data: status, error } = await track('bail', () =>
+      supabase.rpc('host_cant_make_it', { p_roam: roam!.id, p_note: bailNote || null }),
+    );
     if (error) {
       alertError(error);
       return;
@@ -203,8 +201,8 @@ export default function RoamScreen() {
   const notes = ins.filter((i) => i.note);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen>
+    <>
+      <Screen keyboard>
         <TopBar
           onBack={() => router.back()}
           right={
@@ -477,7 +475,7 @@ export default function RoamScreen() {
         person={amHost ? null : roam.host}
         onBlocked={() => router.back()}
       />
-    </KeyboardAvoidingView>
+    </>
   );
 }
 

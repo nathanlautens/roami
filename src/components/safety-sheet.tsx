@@ -4,6 +4,7 @@ import { Alert, Text, View } from 'react-native';
 import { friendlyError } from '@/lib/roams';
 import { supabase } from '@/lib/supabase';
 import { colors, fonts, radius } from '@/lib/theme';
+import { useAction } from '@/lib/use-action';
 import type { Profile } from '@/lib/types';
 import { Body, Button, InlineInput, SelectTile, Sheet } from './ui';
 
@@ -35,7 +36,7 @@ export function SafetySheet({
   const [step, setStep] = useState<'menu' | 'report'>('menu');
   const [reason, setReason] = useState<string | null>(null);
   const [details, setDetails] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, run] = useAction();
   const name = person?.display_name ?? 'them';
 
   function close() {
@@ -47,14 +48,14 @@ export function SafetySheet({
 
   async function sendReport() {
     if (!reason) return;
-    setBusy(true);
-    const { error } = await supabase.rpc('report', {
-      p_user: person?.id ?? null,
-      p_roam: roamId ?? null,
-      p_reason: reason,
-      p_details: details.trim() || null,
-    });
-    setBusy(false);
+    const { error } = await run('report', () =>
+      supabase.rpc('report', {
+        p_user: person?.id ?? null,
+        p_roam: roamId ?? null,
+        p_reason: reason,
+        p_details: details.trim() || null,
+      }),
+    );
     if (error) {
       Alert.alert("Couldn't send that", error.message.includes('too_many_reports') ? friendlyError(error) : 'Try again?');
       return;
@@ -122,7 +123,7 @@ export function SafetySheet({
             accessibilityLabel="More details"
             style={{ minHeight: 72, padding: 12, paddingHorizontal: 12, borderRadius: radius.md, textAlignVertical: 'top' }}
           />
-          <Button label="Send report" onPress={sendReport} loading={busy} disabled={!reason} />
+          <Button label="Send report" onPress={sendReport} loading={!!busy} disabled={!reason} />
           <Button variant="link" label="Back" onPress={() => setStep('menu')} />
         </View>
       )}

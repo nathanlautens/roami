@@ -5,6 +5,7 @@ import { Alert, Text, View } from 'react-native';
 import { Body, Button, Checkbox, Field, H1, Label, Loading, PersonRow, Progress, Screen, TopBar } from '@/components/ui';
 import { useCircles, useFriends } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
+import { toggleIn } from '@/lib/use-action';
 import { colors, fonts } from '@/lib/theme';
 import type { Circle } from '@/lib/types';
 
@@ -36,14 +37,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
   const [picked, setPicked] = useState<Set<string>>(() => new Set(circle?.members.map((m) => m.id) ?? []));
   const [saving, setSaving] = useState(false);
 
-  function toggle(fid: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(fid)) next.delete(fid);
-      else next.add(fid);
-      return next;
-    });
-  }
+  const toggle = (fid: string) => setPicked((prev) => toggleIn(prev, fid));
 
   async function save() {
     const trimmed = name.trim();

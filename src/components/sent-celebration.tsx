@@ -1,7 +1,7 @@
-import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, Text, useWindowDimensions, View } from 'react-native';
 
+import { haptic } from '@/lib/haptics';
 import { clearCelebration, useCelebration } from '@/lib/celebrate';
 import { colors, fonts } from '@/lib/theme';
 import { Sticker } from './ui';
@@ -44,7 +44,7 @@ function Burst({ what, count, title = 'Roam sent!', line }: { what: string; coun
   const [fade] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    haptic.success();
     Animated.parallel([
       Animated.timing(fade, { toValue: 1, duration: 160, useNativeDriver: true }),
       Animated.spring(pop, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),

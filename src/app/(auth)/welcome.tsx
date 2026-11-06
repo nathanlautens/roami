@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,10 +6,11 @@ import { AvatarStack, Body, Button, H1, Label, Sticker, Wordmark } from '@/compo
 import { useAuth } from '@/lib/auth';
 import { SKIP_LOGIN } from '@/lib/config';
 import { colors, fonts } from '@/lib/theme';
+import { useAction } from '@/lib/use-action';
 
 export default function Welcome() {
   const { loginError, retryQuickLogin } = useAuth();
-  const [busy, setBusy] = useState(false);
+  const [busy, run] = useAction();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ground }}>
       <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 }}>
@@ -54,12 +54,8 @@ export default function Welcome() {
               ) : null}
               <Button
                 label="Let's roam"
-                loading={busy}
-                onPress={async () => {
-                  setBusy(true);
-                  await retryQuickLogin();
-                  setBusy(false);
-                }}
+                loading={!!busy}
+                onPress={() => run('login', retryQuickLogin)}
               />
             </>
           ) : (

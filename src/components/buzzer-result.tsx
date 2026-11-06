@@ -1,8 +1,8 @@
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { haptic } from '@/lib/haptics';
 import { nightDayName, nightLong, type OpenRoam } from '@/lib/open-roams';
 import { vibeLabel } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
@@ -14,7 +14,7 @@ export function BuzzerResult({ o, me, onClose }: { o: OpenRoam; me: string; onCl
   const [shake] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    haptic.success();
     Animated.spring(pop, { toValue: 1, friction: 5, tension: 90, useNativeDriver: true }).start();
     Animated.loop(
       Animated.sequence([
