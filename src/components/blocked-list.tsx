@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
-import { PROFILE } from '@/lib/data';
+import { useLoader } from '@/lib/data';
+import { PROFILE } from '@/lib/queries';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -9,24 +9,13 @@ import { Avatar } from './ui';
 
 /** People you've blocked, with an Unblock button. Hidden when empty. */
 export function BlockedList() {
-  const [people, setPeople] = useState<Profile[]>([]);
-
-  const fetchBlocked = useCallback(async () => {
+  const { data: people, reload } = useLoader<Profile[]>(async () => {
     const { data } = await supabase
       .from('blocks')
       .select(`blocked_id, profile:profiles!blocks_blocked_id_fkey(${PROFILE})`)
       .order('created_at', { ascending: false });
     return ((data ?? []) as unknown as { profile: Profile | null }[]).map((b) => b.profile).filter((p): p is Profile => !!p);
   }, []);
-  const load = useCallback(() => fetchBlocked().then(setPeople), [fetchBlocked]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchBlocked().then((p) => !cancelled && setPeople(p));
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchBlocked]);
 
   if (!people.length) return null;
 
@@ -37,7 +26,7 @@ export function BlockedList() {
         text: 'Unblock',
         onPress: async () => {
           await supabase.rpc('unblock_user', { p_user: p.id });
-          load();
+          reload();
         },
       },
     ]);

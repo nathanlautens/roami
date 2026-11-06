@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from './auth';
-import { PROFILE, useLoader } from './data';
+import { useLoader } from './data';
 import { DAY, DAYS, HOUR, LONG_DAYS, MINUTE, MONTHS, splitMinutes } from './format';
+import { PROFILE } from './queries';
 import { matchError } from './roams';
 import { readJSON, writeJSON } from './storage';
 import { supabase } from './supabase';
@@ -28,6 +29,9 @@ export type OpenRoam = {
 
 const OPEN_FIELDS = `id, host_id, buzzer_at, status, locked_roam_id, winning_night, winning_vibe, winning_idea, created_at,
   host:profiles!open_roams_host_id_fkey(${PROFILE})`;
+
+/** Tables whose changes should refresh open Roams. */
+const OPEN_LIVE = ['open_roams', 'open_roam_invites', 'open_roam_night_votes', 'open_roam_vibe_votes', 'open_roam_ideas', 'open_roam_idea_votes'];
 
 /** Loads full details for a set of open Roams in a few queries. */
 async function loadDetails(ids: string[]): Promise<OpenRoam[]> {
@@ -78,7 +82,7 @@ export function useOpenRoams() {
       return loadDetails((data ?? []).map((r) => r.open_roam_id));
     },
     [],
-    ['open_roams', 'open_roam_invites', 'open_roam_night_votes', 'open_roam_vibe_votes', 'open_roam_ideas', 'open_roam_idea_votes'],
+    OPEN_LIVE,
   );
 }
 
@@ -86,7 +90,7 @@ export function useOpenRoam(id: string) {
   return useLoader<OpenRoam | null>(
     async () => (await loadDetails([id]))[0] ?? null,
     null,
-    ['open_roams', 'open_roam_invites', 'open_roam_night_votes', 'open_roam_vibe_votes', 'open_roam_ideas', 'open_roam_idea_votes'],
+    OPEN_LIVE,
   );
 }
 
