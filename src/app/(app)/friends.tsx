@@ -5,7 +5,7 @@ import { Alert, Pressable, Share, Text, TextInput, View } from 'react-native';
 import { MoreIcon, ShareIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
 import { TestTools } from '@/components/test-tools';
-import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
+import { Body, Button, H1, Label, PersonRow, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { addFriend, useFriends } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
@@ -102,7 +102,7 @@ export default function Friends() {
             value={code}
             onChangeText={setCode}
             placeholder="Their code"
-            placeholderTextColor="#5E5670"
+            placeholderTextColor={colors.placeholderOnLime}
             autoCapitalize="characters"
             autoCorrect={false}
             maxLength={9}
@@ -119,13 +119,13 @@ export default function Friends() {
 
       {data.incoming.length ? (
         <View style={{ marginBottom: 24 }}>
-          <Label>Want to roam with you · {data.incoming.length}</Label>
+          <Label count={data.incoming.length}>Want to roam with you</Label>
           <View style={{ gap: 8, marginTop: 10 }}>
             {data.incoming.map(({ id, profile }) => (
-              <Row key={id} profile={profile}>
+              <PersonRow key={id} profile={profile}>
                 <SmallButton label="Nah" onPress={() => decline(id)} />
                 <SmallButton label="Add" primary busy={busyId === profile.id} onPress={() => add(profile.id)} />
-              </Row>
+              </PersonRow>
             ))}
           </View>
         </View>
@@ -135,10 +135,10 @@ export default function Friends() {
 
       {data.friends.length ? (
         <View style={{ marginTop: 28 }}>
-          <Label>Your friends · {data.friends.length}</Label>
+          <Label count={data.friends.length}>Your friends</Label>
           <View style={{ gap: 8, marginTop: 10 }}>
             {data.friends.map((p) => (
-              <Row key={p.id} profile={p}>
+              <PersonRow key={p.id} profile={p}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`More options for ${p.display_name}`}
@@ -147,7 +147,7 @@ export default function Friends() {
                   style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
                   <MoreIcon size={20} />
                 </Pressable>
-              </Row>
+              </PersonRow>
             ))}
           </View>
         </View>
@@ -158,25 +158,15 @@ export default function Friends() {
           <Label>Waiting on them</Label>
           <View style={{ gap: 8, marginTop: 10 }}>
             {data.outgoing.map((p) => (
-              <Row key={p.id} profile={p}>
+              <PersonRow key={p.id} profile={p}>
                 <Tag label="Requested" />
-              </Row>
+              </PersonRow>
             ))}
           </View>
         </View>
       ) : null}
       <SafetySheet visible={!!safetyFor} person={safetyFor} onClose={() => setSafetyFor(null)} onBlocked={reload} />
     </Screen>
-  );
-}
-
-function Row({ profile, children }: { profile: Profile; children?: React.ReactNode }) {
-  return (
-    <Sticker shadow={null} rounded={radius.md} innerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 }}>
-      <Avatar profile={profile} size={40} />
-      <Text style={{ flex: 1, fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{profile.display_name}</Text>
-      {children}
-    </Sticker>
   );
 }
 

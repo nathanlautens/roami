@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
-import { colors, fonts } from '@/lib/theme';
-import { Button, Sticker } from './ui';
+import { colors } from '@/lib/theme';
+import { Button, Label, Sticker } from './ui';
 
 /**
  * Test-only shortcuts. Only shown in development (e.g. Expo Go), never in a
@@ -77,9 +77,7 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
 
   return (
     <Sticker shadow={null} color={colors.muteFill} innerStyle={{ padding: 14, gap: 10 }}>
-      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>
-        TEST MODE · ONLY YOU SEE THIS
-      </Text>
+      <Label>Test mode · only you see this</Label>
       <View style={{ gap: 4 }}>
         <Button variant="dashed" label={busy ? 'One sec…' : 'Load test friends'} onPress={load} />
         <Button variant="dashed" label="Start a test vote (buzzer in 3 min)" onPress={testVote} />

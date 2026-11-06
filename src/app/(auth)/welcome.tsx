@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AvatarStack, Body, Button, H1, Sticker } from '@/components/ui';
+import { AvatarStack, Body, Button, H1, Label, Sticker, Wordmark } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { SKIP_LOGIN } from '@/lib/config';
 import { colors, fonts } from '@/lib/theme';
@@ -14,17 +14,15 @@ export default function Welcome() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ground }}>
       <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 }}>
-        <Text style={{ fontFamily: fonts.display, fontSize: 64, letterSpacing: -2.5, color: colors.ink }}>
-          roami<Text style={{ color: colors.pink }}>.</Text>
-        </Text>
+        <Wordmark />
 
         <View style={{ height: 300, marginTop: 28 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Sticker color={colors.lime} rotate={-6} rounded={22} style={{ position: 'absolute', left: 4, top: 8, width: 230 }} innerStyle={{ padding: 16 }}>
-            <Text style={tiny}>TONIGHT · 7PM</Text>
+            <Label>Tonight · 7pm</Label>
             <Text style={card}>Pub quiz, I'm carrying</Text>
           </Sticker>
           <Sticker color={colors.pink} rotate={5} rounded={22} style={{ position: 'absolute', right: 0, top: 120, width: 200 }} innerStyle={{ padding: 14 }}>
-            <Text style={tiny}>RIGHT NOW</Text>
+            <Label>Right now</Label>
             <Text style={card}>Someone feed me</Text>
           </Sticker>
           <Sticker rotate={-2} rounded={999} offset={4} style={{ position: 'absolute', left: 30, top: 228 }} innerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 16 }}>
@@ -76,5 +74,4 @@ export default function Welcome() {
   );
 }
 
-const tiny = { fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink };
 const card = { fontFamily: fonts.displayBold, fontSize: 24, lineHeight: 27, marginTop: 6, color: colors.ink };

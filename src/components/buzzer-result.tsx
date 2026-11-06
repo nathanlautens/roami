@@ -6,7 +6,7 @@ import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from 'reac
 import { nightDayName, nightLong, type OpenRoam } from '@/lib/open-roams';
 import { vibeLabel } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
-import { Avatar, Button, Sticker } from './ui';
+import { Button, Label, PersonChip, Sticker } from './ui';
 
 /** "BZZZT! It's Friday." The moment an open Roam locks in. */
 export function BuzzerResult({ o, me, onClose }: { o: OpenRoam; me: string; onClose: () => void }) {
@@ -61,7 +61,7 @@ export function BuzzerResult({ o, me, onClose }: { o: OpenRoam; me: string; onCl
 
             <Sticker color={colors.lime} offset={6} rounded={28} innerStyle={{ paddingTop: 30, paddingHorizontal: 20, paddingBottom: 20, gap: 14 }}>
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>THE PEOPLE HAVE SPOKEN</Text>
+                <Label>The people have spoken</Label>
                 <Text style={{ fontFamily: fonts.display, fontSize: 44, lineHeight: 46, letterSpacing: -1.5, color: colors.ink, marginTop: 6 }}>
                   It's {nightDayName(night)}.
                 </Text>
@@ -85,17 +85,12 @@ export function BuzzerResult({ o, me, onClose }: { o: OpenRoam; me: string; onCl
 
               <Sticker shadow={null} rounded={20} innerStyle={{ padding: 12, gap: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>LOCKED IN · {lockedIn.length}</Text>
+                  <Label count={lockedIn.length}>Locked in</Label>
                   <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, color: colors.violet }}>{iAmIn ? "You're in" : "You're not in (yet)"}</Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
                   {lockedIn.map((p) => (
-                    <View key={p.user_id} style={{ alignItems: 'center', gap: 3, width: 46 }}>
-                      <Avatar profile={p.profile} size={40} />
-                      <Text numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.ink }}>
-                        {p.user_id === me ? 'You' : p.profile?.display_name}
-                      </Text>
-                    </View>
+                    <PersonChip key={p.user_id} compact profile={p.profile} label={p.user_id === me ? 'You' : p.profile?.display_name} />
                   ))}
                 </ScrollView>
                 {cantMake.length ? (

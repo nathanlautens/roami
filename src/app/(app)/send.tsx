@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 
 import { PinIcon } from '@/components/icons';
-import { Avatar, Body, Button, Checkbox, Chip, Field, Label, Screen, Tag, TopBar } from '@/components/ui';
+import { Avatar, Body, Button, Checkbox, Chip, Field, Label, Screen, SelectTile, Tag, TopBar } from '@/components/ui';
 import { useCircles, useFriends } from '@/lib/data';
 import { daysAgo, friendlyError, isStale, PROMPTS, VIBES, WHENS, windowFor, type WhenId } from '@/lib/roams';
 import { celebrateSent } from '@/lib/celebrate';
@@ -164,32 +164,28 @@ export default function SendRoam() {
             {(() => {
               const everyone = friends.friends.length > 0 && friends.friends.every((f) => invitees.has(f.id));
               return (
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: everyone }}
+                <SelectTile
+                  role="checkbox"
+                  selected={everyone}
+                  rounded={16}
+                  haptic
                   onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
                     setPeople(everyone ? new Set() : new Set(friends.friends.map((f) => f.id)));
                     if (everyone) setCircleIds(new Set());
                   }}
-                  style={[row, { backgroundColor: everyone ? colors.lime : colors.white }]}>
+                  style={row}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>Everyone</Text>
                     <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>All {friends.friends.length} of your friends</Text>
                   </View>
                   <Checkbox checked={everyone} />
-                </Pressable>
+                </SelectTile>
               );
             })()}
             {circles.map((c) => {
               const on = circleIds.has(c.id);
               return (
-                <Pressable
-                  key={c.id}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on }}
-                  onPress={() => toggle(circleIds, setCircleIds, c.id)}
-                  style={[row, { backgroundColor: on ? colors.lime : colors.white }]}>
+                <SelectTile key={c.id} role="checkbox" selected={on} rounded={16} onPress={() => toggle(circleIds, setCircleIds, c.id)} style={row}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{c.name}</Text>
                     <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>
@@ -198,7 +194,7 @@ export default function SendRoam() {
                   </View>
                   {isStale(c.lastRoamedAt) && c.members.length ? <Tag label="miss them?" color={colors.pink} dark /> : null}
                   <Checkbox checked={on} />
-                </Pressable>
+                </SelectTile>
               );
             })}
 
@@ -208,27 +204,16 @@ export default function SendRoam() {
                   const on = invitees.has(f.id);
                   const viaCircle = on && !people.has(f.id);
                   return (
-                    <Pressable
+                    <SelectTile
                       key={f.id}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: on }}
+                      role="checkbox"
+                      selected={on}
+                      rounded={radius.pill}
                       onPress={() => !viaCircle && toggle(people, setPeople, f.id)}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingLeft: 4,
-                        paddingRight: 12,
-                        minHeight: 40,
-                        borderRadius: radius.pill,
-                        borderWidth: 2,
-                        borderColor: colors.ink,
-                        backgroundColor: on ? colors.lime : colors.white,
-                        opacity: viaCircle ? 0.6 : 1,
-                      }}>
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 4, paddingRight: 12, minHeight: 40, borderWidth: 2, opacity: viaCircle ? 0.6 : 1 }}>
                       <Avatar profile={f} size={30} />
                       <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }}>{f.display_name}</Text>
-                    </Pressable>
+                    </SelectTile>
                   );
                 })}
               </View>
@@ -289,18 +274,17 @@ export default function SendRoam() {
               {buzzers.map((b) => {
                 const on = buzzer?.id === b.id;
                 return (
-                  <Pressable
+                  <SelectTile
                     key={b.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => {});
-                      setBuzzerId(b.id);
-                    }}
-                    style={{ flexBasis: '31%', flexGrow: 1, minHeight: 54, borderRadius: radius.sm, borderWidth: border, borderColor: colors.ink, backgroundColor: on ? colors.yellow : colors.white, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+                    selected={on}
+                    selectedColor={colors.yellow}
+                    rounded={radius.sm}
+                    haptic
+                    onPress={() => setBuzzerId(b.id)}
+                    style={{ flexBasis: '31%', flexGrow: 1, minHeight: 54, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
                     <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }} numberOfLines={1}>{b.label}</Text>
                     {b.sub ? <Text style={{ fontFamily: fonts.body, fontSize: 11.5, color: colors.inkSoft }}>{b.sub}</Text> : null}
-                  </Pressable>
+                  </SelectTile>
                 );
               })}
             </View>
@@ -350,39 +334,28 @@ export default function SendRoam() {
           {WHENS.map((w) => {
             const on = when === w.id;
             return (
-              <Pressable
+              <SelectTile
                 key={w.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setWhen(w.id);
-                }}
-                style={{
-                  flex: 1,
-                  minHeight: 56,
-                  borderRadius: radius.sm,
-                  borderWidth: border,
-                  borderColor: colors.ink,
-                  backgroundColor: on ? colors.pink : colors.white,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingHorizontal: 2,
-                }}>
+                selected={on}
+                selectedColor={colors.pink}
+                rounded={radius.sm}
+                haptic
+                onPress={() => setWhen(w.id)}
+                style={{ flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
                 <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink }} numberOfLines={1}>{w.label}</Text>
                 <Text style={{ fontFamily: fonts.body, fontSize: 11.5, color: colors.inkSoft }}>{w.sub}</Text>
-              </Pressable>
+              </SelectTile>
             );
           })}
         </View>
 
-        <View style={[row, { marginTop: 10, borderStyle: 'dashed', backgroundColor: 'transparent' }]}>
+        <View style={[row, { marginTop: 10, borderWidth: border, borderColor: colors.ink, borderRadius: 16, borderStyle: 'dashed' }]}>
           <PinIcon size={18} />
           <TextInput
             value={where}
             onChangeText={setWhere}
             placeholder="Where? (optional)"
-            placeholderTextColor="#8B82A3"
+            placeholderTextColor={colors.placeholder}
             maxLength={80}
             accessibilityLabel="Where"
             style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.ink, minHeight: 28 }}
@@ -402,15 +375,7 @@ export default function SendRoam() {
   );
 }
 
-const row = {
-  flexDirection: 'row' as const,
-  alignItems: 'center' as const,
-  gap: 10,
-  padding: 12,
-  borderWidth: border,
-  borderColor: colors.ink,
-  borderRadius: 16,
-};
+const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, padding: 12 };
 
 // ─── Find a night helpers ───────────────────────────────────────
 

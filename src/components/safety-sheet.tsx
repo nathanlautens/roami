@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { friendlyError } from '@/lib/roams';
 import { supabase } from '@/lib/supabase';
-import { border, colors, fonts, radius } from '@/lib/theme';
+import { colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
-import { Body, Button, Sheet } from './ui';
+import { Body, Button, InlineInput, SelectTile, Sheet } from './ui';
 
 const REASONS: { id: string; label: string }[] = [
   { id: 'harassment', label: 'Being mean or harassing' },
@@ -108,33 +108,19 @@ export function SafetySheet({
           {REASONS.map((r) => {
             const on = reason === r.id;
             return (
-              <Pressable
-                key={r.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
-                onPress={() => setReason(r.id)}
-                style={{
-                  minHeight: 48,
-                  paddingHorizontal: 14,
-                  justifyContent: 'center',
-                  borderWidth: border,
-                  borderColor: colors.ink,
-                  borderRadius: radius.md,
-                  backgroundColor: on ? colors.lime : colors.white,
-                }}>
+              <SelectTile key={r.id} selected={on} onPress={() => setReason(r.id)} style={{ minHeight: 48, paddingHorizontal: 14, justifyContent: 'center' }}>
                 <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}>{r.label}</Text>
-              </Pressable>
+              </SelectTile>
             );
           })}
-          <TextInput
+          <InlineInput
             value={details}
             onChangeText={setDetails}
             placeholder="Anything else we should know? (optional)"
-            placeholderTextColor="#8B82A3"
             maxLength={500}
             multiline
             accessibilityLabel="More details"
-            style={{ minHeight: 72, padding: 12, borderWidth: border, borderColor: colors.ink, borderRadius: radius.md, backgroundColor: colors.white, fontFamily: fonts.body, fontSize: 15, color: colors.ink, textAlignVertical: 'top' }}
+            style={{ minHeight: 72, padding: 12, paddingHorizontal: 12, borderRadius: radius.md, textAlignVertical: 'top' }}
           />
           <Button label="Send report" onPress={sendReport} loading={busy} disabled={!reason} />
           <Button variant="link" label="Back" onPress={() => setStep('menu')} />

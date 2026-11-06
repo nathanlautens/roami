@@ -1,10 +1,26 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 
-import { CheckIcon } from '@/components/icons';
-import { Avatar, Body, Button, H1, Label, Loading, Screen, Sticker, Tag, TopBar } from '@/components/ui';
+import {
+  Avatar,
+  Body,
+  Button,
+  Checkbox,
+  H1,
+  InlineInput,
+  Label,
+  Loading,
+  MissingScreen,
+  PersonChip,
+  ProgressBar,
+  Screen,
+  SelectTile,
+  Sticker,
+  Tag,
+  TopBar,
+} from '@/components/ui';
 import { alertError } from '@/lib/alerts';
 import { useAuth } from '@/lib/auth';
 import {
@@ -42,18 +58,7 @@ export default function OpenRoamScreen() {
 
   if (loading && !o) return <Loading />;
   if (!o) {
-    return (
-      <Screen>
-        <TopBar onBack={() => router.back()} />
-        <H1 style={{ marginTop: 24 }}>{error ? "Couldn't load this one." : 'This vote has left the chat.'}</H1>
-        {error ? (
-          <View style={{ gap: 12, marginTop: 12 }}>
-            <Body>{error}</Body>
-            <Button variant="dashed" label="Try again" onPress={reload} />
-          </View>
-        ) : null}
-      </Screen>
-    );
+    return <MissingScreen title={error ? "Couldn't load this one." : 'This vote has left the chat.'} error={error} onRetry={reload} />;
   }
 
   if (o.status !== 'open' || buzzed) return <Result o={o} me={me} />;
@@ -170,21 +175,27 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
             const d = new Date(n);
             const plans = eventsOnNight(calBusy, n);
             return (
-              <Pressable
+              <SelectTile
                 key={n}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: on }}
+                role="checkbox"
+                selected={on}
+                selectedColor={colors.white}
+                color={colors.ground}
                 accessibilityLabel={`${nightLong(n)}, ${free.length} free`}
                 onPress={() => toggle(nights, setNights, n)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderWidth: border, borderColor: colors.ink, borderRadius: radius.md, backgroundColor: on ? colors.white : colors.ground }}>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 }}>
                 <View style={{ width: 50, alignItems: 'center' }}>
                   <Text style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.ink }}>{DAYS[d.getDay()].toUpperCase()}</Text>
                   <Text style={{ fontFamily: fonts.display, fontSize: 24, lineHeight: 26, color: colors.ink }}>{d.getDate()}</Text>
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
-                  <View style={{ height: 10, borderRadius: 6, backgroundColor: colors.muteFill, borderWidth: 1.5, borderColor: colors.ink, overflow: 'hidden' }}>
-                    <View style={{ height: '100%', width: `${Math.round((free.length / maxFree) * 100)}%`, backgroundColor: n === s.leadNight ? colors.lime : colors.lilac }} />
-                  </View>
+                  <ProgressBar
+                    value={free.length / maxFree}
+                    color={n === s.leadNight ? colors.lime : colors.lilac}
+                    track={colors.muteFill}
+                    height={10}
+                    borderWidth={1.5}
+                  />
                   <Text numberOfLines={1} style={{ fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.inkSoft }}>
                     {free.length} free{names.length ? ` · ${joinShort(names)}` : ''}
                   </Text>
@@ -195,10 +206,8 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
                     </Text>
                   ) : null}
                 </View>
-                <View style={{ width: 26, height: 26, borderRadius: 8, borderWidth: border, borderColor: colors.ink, backgroundColor: on ? colors.lime : colors.white, alignItems: 'center', justifyContent: 'center' }}>
-                  {on ? <CheckIcon size={15} /> : null}
-                </View>
-              </Pressable>
+                <Checkbox checked={on} />
+              </SelectTile>
             );
           })}
         </View>
@@ -248,16 +257,15 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
             );
           })}
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TextInput
+            <InlineInput
               value={pitch}
               onChangeText={setPitch}
               placeholder="Pitch an idea…"
-              placeholderTextColor="#8B82A3"
               maxLength={60}
               accessibilityLabel="Pitch an idea"
               returnKeyType="done"
               onSubmitEditing={addIdea}
-              style={{ flex: 1, minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderStyle: 'dashed', borderColor: colors.ink, borderRadius: 16, fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}
+              style={{ flex: 1, borderStyle: 'dashed', backgroundColor: 'transparent', fontFamily: fonts.bodyBold }}
             />
             <Pressable
               accessibilityRole="button"
@@ -307,7 +315,7 @@ function Result({ o, me }: { o: OpenRoam; me: string }) {
       footer={o.locked_roam_id ? <Button label="See the Roam" onPress={() => router.replace(`/roam/${o.locked_roam_id}`)} /> : undefined}>
       <TopBar onBack={() => router.back()} right={<Tag label="Locked in" color={colors.lime} />} />
       <Sticker color={colors.lime} rotate={-1.5} style={{ marginTop: 20 }} innerStyle={{ padding: 20, gap: 10 }}>
-        <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>THE PEOPLE HAVE SPOKEN</Text>
+        <Label>The people have spoken</Label>
         <Text style={{ fontFamily: fonts.display, fontSize: 40, lineHeight: 42, letterSpacing: -1.2, color: colors.ink }}>
           It's {nightDayName(night)}.
         </Text>
@@ -316,17 +324,12 @@ function Result({ o, me }: { o: OpenRoam; me: string }) {
         </Text>
         {o.winning_idea ? <Text style={{ fontFamily: fonts.displayBold, fontSize: 20, color: colors.ink }}>“{o.winning_idea}”</Text> : null}
       </Sticker>
-      <Label style={{ marginTop: 24 }}>Locked in · {free.size}</Label>
+      <Label style={{ marginTop: 24 }} count={free.size}>Locked in</Label>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
         {o.people
           .filter((p) => free.has(p.user_id))
           .map((p) => (
-            <View key={p.user_id} style={{ alignItems: 'center', gap: 4, width: 56 }}>
-              <Avatar profile={p.profile} size={48} />
-              <Text numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink }}>
-                {p.user_id === me ? 'You' : p.profile?.display_name}
-              </Text>
-            </View>
+            <PersonChip key={p.user_id} profile={p.profile} label={p.user_id === me ? 'You' : p.profile?.display_name} />
           ))}
       </View>
     </Screen>

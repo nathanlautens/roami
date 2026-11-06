@@ -3,9 +3,9 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { useLoader } from '@/lib/data';
 import { PROFILE } from '@/lib/queries';
 import { supabase } from '@/lib/supabase';
-import { border, colors, fonts, radius } from '@/lib/theme';
+import { colors, fonts } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
-import { Avatar } from './ui';
+import { Label, PersonRow } from './ui';
 
 /** People you've blocked, with an Unblock button. Hidden when empty. */
 export function BlockedList() {
@@ -34,17 +34,13 @@ export function BlockedList() {
 
   return (
     <View style={{ gap: 8 }}>
-      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>BLOCKED · {people.length}</Text>
+      <Label count={people.length}>Blocked</Label>
       {people.map((p) => (
-        <View
-          key={p.id}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderWidth: border, borderColor: colors.ink, borderRadius: radius.md, backgroundColor: colors.white }}>
-          <Avatar profile={p} size={36} faded />
-          <Text style={{ flex: 1, fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}>{p.display_name}</Text>
+        <PersonRow key={p.id} profile={p} avatarSize={36} nameSize={15} faded>
           <Pressable accessibilityRole="button" onPress={() => unblock(p)} style={{ minHeight: 40, paddingHorizontal: 12, justifyContent: 'center' }}>
             <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: colors.violet }}>Unblock</Text>
           </Pressable>
-        </View>
+        </PersonRow>
       ))}
     </View>
   );

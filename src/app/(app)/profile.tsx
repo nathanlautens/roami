@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Switch, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { BlockedList } from '@/components/blocked-list';
 import { CalendarSettings } from '@/components/calendar-settings';
 import { ProfileForm } from '@/components/profile-form';
-import { Body, Button, H1, Label, Screen, Sticker, TopBar } from '@/components/ui';
+import { Body, Button, H1, Label, Screen, Sticker, SwitchRow, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { removePhotos } from '@/lib/avatar';
 import {
@@ -101,18 +101,8 @@ export default function ProfileScreen() {
           ) : null}
 
           {kind ? (
-            <Sticker shadow={null} innerStyle={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>Unlock with {label}</Text>
-                <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>Asked when you open Roami</Text>
-              </View>
-              <Switch
-                value={unlock}
-                onValueChange={toggleUnlock}
-                trackColor={{ true: colors.ink, false: colors.mute }}
-                thumbColor={colors.lime}
-                accessibilityLabel={`Unlock with ${label}`}
-              />
+            <Sticker shadow={null} innerStyle={{ padding: 14 }}>
+              <SwitchRow large title={`Unlock with ${label}`} sub="Asked when you open Roami" value={unlock} onChange={toggleUnlock} />
             </Sticker>
           ) : null}
 

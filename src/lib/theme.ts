@@ -12,6 +12,8 @@ export const colors = {
   muteFill: '#E4DCF7',
   violet: '#6B2BD9',
   dim: 'rgba(23, 18, 31, 0.55)',
+  placeholder: '#8B82A3',
+  placeholderOnLime: '#5E5670',
 };
 
 // Friendly avatar colours, picked from a person's id so they're stable.

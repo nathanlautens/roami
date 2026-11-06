@@ -1,11 +1,30 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AddPersonIcon, ClashIcon, MoreIcon, PinIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
-import { Avatar, Body, Button, Checkbox, Chip, H1, Label, Loading, Screen, Sheet, Sticker, Tag, TopBar } from '@/components/ui';
+import {
+  Avatar,
+  Body,
+  Button,
+  Checkbox,
+  Chip,
+  H1,
+  InlineInput,
+  Label,
+  Loading,
+  MissingScreen,
+  PersonChip,
+  PersonRow,
+  Screen,
+  SelectTile,
+  Sheet,
+  Sticker,
+  Tag,
+  TopBar,
+} from '@/components/ui';
 import { alertError } from '@/lib/alerts';
 import { useAuth } from '@/lib/auth';
 import { findClashes, useFriends, useRoam } from '@/lib/data';
@@ -64,18 +83,7 @@ export default function RoamScreen() {
   if (loading && !data.roam) return <Loading />;
   const roam = data.roam;
   if (!roam) {
-    return (
-      <Screen>
-        <TopBar onBack={() => router.back()} />
-        <H1 style={{ marginTop: 24 }}>{error ? "Couldn't load this Roam." : 'This Roam has left the chat.'}</H1>
-        {error ? (
-          <View style={{ gap: 12, marginTop: 12 }}>
-            <Body>{error}</Body>
-            <Button variant="dashed" label="Try again" onPress={reload} />
-          </View>
-        ) : null}
-      </Screen>
-    );
+    return <MissingScreen title={error ? "Couldn't load this Roam." : 'This Roam has left the chat.'} error={error} onRetry={reload} />;
   }
 
   const ins = data.invites.filter((i) => i.response === 'in');
@@ -268,15 +276,10 @@ export default function RoamScreen() {
         ) : null}
 
         {/* Who's in */}
-        <Label style={{ marginTop: 26 }}>Who's in · {ins.length}</Label>
+        <Label style={{ marginTop: 26 }} count={ins.length}>Who's in</Label>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, marginTop: 10 }}>
           {ins.map((i) => (
-            <View key={i.user_id} style={{ alignItems: 'center', gap: 4, width: 56 }}>
-              <Avatar profile={i.profile} size={48} />
-              <Text numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink }}>
-                {i.user_id === me ? 'You' : i.profile?.display_name}
-              </Text>
-            </View>
+            <PersonChip key={i.user_id} profile={i.profile} label={i.user_id === me ? 'You' : i.profile?.display_name} />
           ))}
           {!amHost && myResponse !== 'in' && active && roam.status === 'live' ? (
             <View style={{ alignItems: 'center', gap: 4, width: 56 }}>
@@ -359,16 +362,14 @@ export default function RoamScreen() {
                 );
               })}
             </View>
-            <TextInput
+            <InlineInput
               value={noteValue}
               onChangeText={setNote}
               // Saves the note with your actual answer (not an expired Maybe shown as Can't).
               onEndEditing={() => mine?.response && note !== null && note !== (mine.note ?? '') && respond(mine.response)}
               placeholder="Add a note… (optional)"
-              placeholderTextColor="#8B82A3"
               maxLength={80}
               accessibilityLabel="Add a note"
-              style={{ minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderColor: colors.ink, borderRadius: 16, backgroundColor: colors.white, fontFamily: fonts.body, fontSize: 15, color: colors.ink }}
             />
             {mine?.response === 'maybe' && myResponse === 'cant' ? (
               <Body style={{ fontSize: 14 }}>Your Maybe expired an hour before the start. Still keen? Tap I'm in.</Body>
@@ -404,12 +405,13 @@ export default function RoamScreen() {
           {[...(clashes ?? []), roam].map((r) => {
             const on = skip === r.id;
             return (
-              <Pressable
+              <SelectTile
                 key={r.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
+                selected={on}
+                selectedColor={colors.muteFill}
+                rounded={20}
                 onPress={() => setSkip(r.id)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderWidth: border, borderColor: colors.ink, borderRadius: 20, backgroundColor: on ? colors.muteFill : colors.white }}>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}>
                 <Avatar profile={r.host} size={44} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: fonts.displayBold, fontSize: 18, color: colors.ink, textDecorationLine: on ? 'line-through' : 'none' }}>{r.what}</Text>
@@ -418,7 +420,7 @@ export default function RoamScreen() {
                   </Text>
                 </View>
                 {on ? <Tag label="skip" dark /> : null}
-              </Pressable>
+              </SelectTile>
             );
           })}
         </View>
@@ -441,14 +443,13 @@ export default function RoamScreen() {
             <Chip key={r} label={r} selected={bailNote === r} onPress={() => setBailNote(r)} />
           ))}
         </View>
-        <TextInput
+        <InlineInput
           value={bailNote}
           onChangeText={setBailNote}
           maxLength={80}
           placeholder="Or say why…"
-          placeholderTextColor="#8B82A3"
           accessibilityLabel="Reason"
-          style={{ minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderColor: colors.ink, borderRadius: 16, backgroundColor: colors.white, fontFamily: fonts.body, fontSize: 15, color: colors.ink, marginBottom: 18 }}
+          style={{ marginBottom: 18 }}
         />
         <Button label={ins.length > 1 ? 'Hand it over' : 'Call it off'} onPress={hostBail} />
         <Button variant="link" label="Actually, I'm still going" onPress={() => setBailOpen(false)} />
@@ -462,15 +463,9 @@ export default function RoamScreen() {
           {friends.friends
             .filter((f) => f.id !== roam.host_id && !data.invites.some((i) => i.user_id === f.id))
             .map((f) => (
-              <Pressable
-                key={f.id}
-                accessibilityRole="button"
-                onPress={() => bring(f.id)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderWidth: border, borderColor: colors.ink, borderRadius: radius.md, backgroundColor: colors.white }}>
-                <Avatar profile={f} size={40} />
-                <Text style={{ flex: 1, fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{f.display_name}</Text>
+              <PersonRow key={f.id} profile={f} onPress={() => bring(f.id)}>
                 <Checkbox checked={false} />
-              </Pressable>
+              </PersonRow>
             ))}
         </ScrollView>
         <Button variant="link" label="Never mind" onPress={() => setBringOpen(false)} />
@@ -490,7 +485,7 @@ function PeopleLine({ label, people }: { label: string; people: string[] }) {
   if (!people.length) return null;
   return (
     <View style={{ gap: 4 }}>
-      <Label>{label} · {people.length}</Label>
+      <Label count={people.length}>{label}</Label>
       <Text style={{ fontFamily: fonts.body, fontSize: 15, color: colors.inkSoft }}>{people.join(', ')}</Text>
     </View>
   );
