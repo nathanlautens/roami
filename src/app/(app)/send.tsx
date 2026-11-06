@@ -1,19 +1,21 @@
 import * as Haptics from 'expo-haptics';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { Alert, Pressable, Text, TextInput, View, type ViewStyle } from 'react-native';
 
 import { PinIcon } from '@/components/icons';
-import { Avatar, Body, Button, Checkbox, Chip, Field, Label, Screen, Tag, TopBar } from '@/components/ui';
+import { Avatar, Body, Button, Checkbox, Chip, FormField, Label, Screen, Tag, TopBar } from '@/components/ui';
 import { useCircles, useFriends } from '@/lib/data';
-import { daysAgo, friendlyError, isStale, longName, PROMPTS, toggled, VIBES, WHENS, windowFor, type WhenId } from '@/lib/roams';
+import { daysAgo, friendlyError, isStale, longName, PROMPTS, toggled, VIBES, WHENS, windowFor } from '@/lib/roams';
 import { celebrateSent } from '@/lib/signals';
 import { openRoamError } from '@/lib/open-roams';
 import { invalidate } from '@/lib/query';
+import { sendSchema } from '@/lib/schemas';
 import { supabase } from '@/lib/supabase';
 import { busyOnNight, useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
-import type { Vibe } from '@/lib/types';
 
 const SPOTS: (number | null)[] = [null, 2, 4, 6, 10];
 
@@ -22,97 +24,89 @@ export default function SendRoam() {
   const { data: circles } = useCircles();
   const { data: friends } = useFriends();
 
-  const [circleIds, setCircleIds] = useState<Set<string>>(new Set());
-  const [people, setPeople] = useState<Set<string>>(new Set(params.to ? params.to.split(',') : []));
+  const { control, handleSubmit, setValue, formState } = useForm({
+    resolver: zodResolver(sendSchema),
+    defaultValues: {
+      mode: params.mode === 'find' ? 'find' : 'now',
+      circleIds: [],
+      people: params.to ? params.to.split(',') : [],
+      what: params.what ?? '',
+      vibe: null,
+      when: 'tonight',
+      where: '',
+      spots: null,
+      nights: [],
+      buzzerId: null,
+      idea: '',
+    },
+  });
+  const { mode, what, vibe, when, spots, buzzerId, ...lists } = useWatch({ control });
+  const circleIds = new Set(lists.circleIds);
+  const people = new Set(lists.people);
+  const nights = new Set(lists.nights);
   const [showPeople, setShowPeople] = useState(!!params.to);
-  const [what, setWhat] = useState(params.what ?? '');
-  const [vibe, setVibe] = useState<Vibe | null>(null);
-  const [when, setWhen] = useState<WhenId>('tonight');
-  const [where, setWhere] = useState('');
-  const [spots, setSpots] = useState<number | null>(null);
-  const [sending, setSending] = useState(false);
   const [placeholder] = useState(() => PROMPTS[Math.floor(Math.random() * PROMPTS.length)]);
-  const [mode, setMode] = useState<'now' | 'find'>(params.mode === 'find' ? 'find' : 'now');
-  // Find a night
   const [days] = useState(() => twoWeeks());
-  // Dots on nights you already have plans (if calendar checks are on).
   const calBusy = useBusy(
     mode === 'find' ? new Date(new Date(days[0].iso).getTime() - 19 * 3600_000) : null,
     mode === 'find' ? new Date(new Date(days[13].iso).getTime() + 5 * 3600_000) : null,
   );
   const busyNight = (iso: string) => busyOnNight(calBusy, iso).length > 0;
-  const [nights, setNights] = useState<Set<string>>(new Set());
-  const [buzzerId, setBuzzerId] = useState<string | null>(null);
-  const [idea, setIdea] = useState('');
 
   // Only current friends can be invited, so the count on the button is the real count.
-  const invitees = useMemo(() => {
-    const friendIds = new Set(friends.friends.map((f) => f.id));
-    const ids = new Set([...people].filter((id) => friendIds.has(id)));
-    for (const c of circles) if (circleIds.has(c.id)) c.members.forEach((m) => friendIds.has(m.id) && ids.add(m.id));
-    return ids;
-  }, [circles, circleIds, people, friends.friends]);
+  const friendIds = new Set(friends.friends.map((f) => f.id));
+  const invitees = new Set([...people].filter((id) => friendIds.has(id)));
+  for (const c of circles) if (circleIds.has(c.id)) c.members.forEach((m) => friendIds.has(m.id) && invitees.add(m.id));
 
-  function toggle(set: Set<string>, setter: (s: Set<string>) => void, id: string) {
+  function toggle(name: 'circleIds' | 'people' | 'nights', set: Set<string>, id: string) {
     Haptics.selectionAsync().catch(() => {});
-    setter(toggled(set, id));
+    setValue(name, [...toggled(set, id)]);
   }
 
   const firstNight = [...nights].sort()[0] ?? null;
   const buzzers = buzzerOptions(firstNight ? new Date(firstNight) : null);
   const buzzer = buzzers.find((b) => b.id === buzzerId) ?? buzzers.find((b) => b.id === 'tomorrow') ?? buzzers.at(-1) ?? null;
 
-  async function startVote() {
-    if (!nights.size || invitees.size === 0 || !buzzer) return;
-    setSending(true);
-    const { error } = await supabase.rpc('start_open_roam', {
-      p_nights: [...nights].sort(),
-      p_buzzer_at: buzzer.at.toISOString(),
-      p_invitees: [...invitees],
-      p_idea: idea.trim() || null,
-    });
-    setSending(false);
-    if (error) {
-      Alert.alert('Not started', openRoamError(error));
-      return;
-    }
-    invalidate('openRoams');
-    celebrateSent({
-      what: `${nights.size} ${nights.size === 1 ? 'night' : 'nights'} on the table`,
-      count: invitees.size,
-      title: "Vote's open!",
-      line: `Buzzer goes off ${buzzer.label.toLowerCase()}${buzzer.sub ? ` (${buzzer.sub})` : ''}.`,
-    });
-    router.dismissTo('/');
-  }
-
-  async function send() {
-    if (mode === 'find') return startVote();
-    if (!what.trim() || invitees.size === 0) return;
-    setSending(true);
-    const { start, end } = windowFor(when);
-    const { error } = await supabase.rpc('send_roam', {
-      p_what: what.trim(),
-      p_vibe: vibe,
-      p_location: where.trim() || null,
-      p_starts_at: start.toISOString(),
-      p_ends_at: end.toISOString(),
-      p_max_spots: spots,
-      p_invitees: [...invitees],
-    });
-    setSending(false);
-    if (error) {
-      Alert.alert('Not sent', friendlyError(error));
-      return;
-    }
-    // Back to home, where the "Roam sent!" celebration plays over the feed.
-    invalidate('feed');
-    celebrateSent({ what: what.trim(), count: invitees.size });
-    router.dismissTo('/');
-  }
+  const send = () =>
+    handleSubmit(async (v) => {
+      if (invitees.size === 0) return;
+      if (v.mode === 'find') {
+        if (!buzzer) return;
+        const { error } = await supabase.rpc('start_open_roam', {
+          p_nights: [...v.nights].sort(),
+          p_buzzer_at: buzzer.at.toISOString(),
+          p_invitees: [...invitees],
+          p_idea: v.idea || null,
+        });
+        if (error) return Alert.alert('Not started', openRoamError(error));
+        invalidate('openRoams');
+        celebrateSent({
+          what: `${v.nights.length} ${v.nights.length === 1 ? 'night' : 'nights'} on the table`,
+          count: invitees.size,
+          title: "Vote's open!",
+          line: `Buzzer goes off ${buzzer.label.toLowerCase()}${buzzer.sub ? ` (${buzzer.sub})` : ''}.`,
+        });
+      } else {
+        const { start, end } = windowFor(v.when);
+        const { error } = await supabase.rpc('send_roam', {
+          p_what: v.what,
+          p_vibe: v.vibe,
+          p_location: v.where || null,
+          p_starts_at: start.toISOString(),
+          p_ends_at: end.toISOString(),
+          p_max_spots: v.spots,
+          p_invitees: [...invitees],
+        });
+        if (error) return Alert.alert('Not sent', friendlyError(error));
+        invalidate('feed');
+        celebrateSent({ what: v.what, count: invitees.size });
+      }
+      // Back to home, where the celebration plays over the feed.
+      router.dismissTo('/');
+    })();
 
   const n = invitees.size;
-  const ready = mode === 'find' ? n > 0 && nights.size > 0 && !!buzzer : n > 0 && !!what.trim();
+  const ready = mode === 'find' ? n > 0 && nights.size > 0 && !!buzzer : n > 0 && !!what?.trim();
   const cta =
     n === 0
       ? 'Pick some people'
@@ -122,12 +116,12 @@ export default function SendRoam() {
           : !buzzer
             ? 'Nights are too soon for a buzzer'
             : `Start the vote · ${n} ${n === 1 ? 'person' : 'people'}`
-        : !what.trim()
+        : !what?.trim()
           ? "What's the plan?"
           : `Send it to ${n} ${n === 1 ? 'person' : 'people'}`;
 
   return (
-    <Screen keyboard footer={<Button label={cta} onPress={send} loading={sending} disabled={!ready} />}>
+    <Screen keyboard footer={<Button label={cta} onPress={send} loading={formState.isSubmitting} disabled={!ready} />}>
       <TopBar onBack={() => router.back()} close title="New Roam" />
 
       <View style={{ flexDirection: 'row', marginTop: 16, borderWidth: border, borderColor: colors.ink, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.white }}>
@@ -143,7 +137,7 @@ export default function SendRoam() {
             accessibilityState={{ selected: mode === m.id }}
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
-              setMode(m.id);
+              setValue('mode', m.id);
             }}
             style={{ flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: mode === m.id ? colors.ink : colors.white }}>
             <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: mode === m.id ? colors.lime : colors.ink }}>{m.label}</Text>
@@ -167,8 +161,8 @@ export default function SendRoam() {
                 accessibilityState={{ checked: everyone }}
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
-                  setPeople(everyone ? new Set() : new Set(friends.friends.map((f) => f.id)));
-                  if (everyone) setCircleIds(new Set());
+                  setValue('people', everyone ? [] : friends.friends.map((f) => f.id));
+                  if (everyone) setValue('circleIds', []);
                 }}
                 style={[row, { backgroundColor: everyone ? colors.lime : colors.white }]}>
                 <View style={{ flex: 1 }}>
@@ -186,7 +180,7 @@ export default function SendRoam() {
                 key={c.id}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on }}
-                onPress={() => toggle(circleIds, setCircleIds, c.id)}
+                onPress={() => toggle('circleIds', circleIds, c.id)}
                 style={[row, { backgroundColor: on ? colors.lime : colors.white }]}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{c.name}</Text>
@@ -210,7 +204,7 @@ export default function SendRoam() {
                     key={f.id}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: on }}
-                    onPress={() => !viaCircle && toggle(people, setPeople, f.id)}
+                    onPress={() => !viaCircle && toggle('people', people, f.id)}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -258,7 +252,7 @@ export default function SendRoam() {
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on, disabled: d.past }}
                 accessibilityLabel={`${d.label}${busyNight(d.iso) ? ', you have plans' : ''}`}
-                onPress={() => toggle(nights, setNights, d.iso)}
+                onPress={() => toggle('nights', nights, d.iso)}
                 style={{
                   flex: 1,
                   height: 46,
@@ -285,7 +279,7 @@ export default function SendRoam() {
         buzzers.length ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
             {buzzers.map((b) => (
-              <Option key={b.id} label={b.label} sub={b.sub} on={buzzer?.id === b.id} color={colors.yellow} onPress={() => setBuzzerId(b.id)} style={{ flexBasis: '31%', flexGrow: 1 }} />
+              <Option key={b.id} label={b.label} sub={b.sub} on={buzzer?.id === b.id} color={colors.yellow} onPress={() => setValue('buzzerId', b.id)} style={{ flexBasis: '31%', flexGrow: 1 }} />
             ))}
           </View>
         ) : (
@@ -305,18 +299,18 @@ export default function SendRoam() {
 
       <Label style={{ marginTop: 22 }}>Got an idea? (optional)</Label>
       <View style={{ marginTop: 8 }}>
-        <Field value={idea} onChangeText={setIdea} placeholder="e.g. that new taco place" maxLength={60} accessibilityLabel="Your idea" />
+        <FormField control={control} name="idea" placeholder="e.g. that new taco place" maxLength={60} accessibilityLabel="Your idea" />
       </View>
         </>
       ) : (
         <>
       <Label style={{ marginTop: 22 }}>What's the plan?</Label>
       <View style={{ marginTop: 8 }}>
-        <Field
+        <FormField
+          control={control}
+          name="what"
           big
           multiline
-          value={what}
-          onChangeText={setWhat}
           placeholder={placeholder}
           maxLength={80}
           accessibilityLabel="What's the plan?"
@@ -325,34 +319,37 @@ export default function SendRoam() {
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
         {VIBES.map((v) => (
-          <Chip key={v.id} label={v.label} selected={vibe === v.id} onPress={() => setVibe(vibe === v.id ? null : v.id)} />
+          <Chip key={v.id} label={v.label} selected={vibe === v.id} onPress={() => setValue('vibe', vibe === v.id ? null : v.id)} />
         ))}
       </View>
 
       <Label style={{ marginTop: 22 }}>When are you free?</Label>
       <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
         {WHENS.map((w) => (
-          <Option key={w.id} label={w.label} sub={w.sub} on={when === w.id} color={colors.pink} onPress={() => setWhen(w.id)} style={{ flex: 1 }} />
+          <Option key={w.id} label={w.label} sub={w.sub} on={when === w.id} color={colors.pink} onPress={() => setValue('when', w.id)} style={{ flex: 1 }} />
         ))}
       </View>
 
       <View style={[row, { marginTop: 10, borderStyle: 'dashed', backgroundColor: 'transparent' }]}>
         <PinIcon size={18} />
-        <TextInput
-          value={where}
-          onChangeText={setWhere}
-          placeholder="Where? (optional)"
-          placeholderTextColor="#8B82A3"
-          maxLength={80}
-          accessibilityLabel="Where"
-          style={{ flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.ink, minHeight: 28 }}
-        />
+        <View style={{ flex: 1 }}>
+          <FormField
+            control={control}
+            name="where"
+            input={TextInput}
+            placeholder="Where? (optional)"
+            placeholderTextColor="#8B82A3"
+            maxLength={80}
+            accessibilityLabel="Where"
+            style={{ fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.ink, minHeight: 28 }}
+          />
+        </View>
       </View>
 
       <Label style={{ marginTop: 22 }}>Spots</Label>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
         {SPOTS.map((sp) => (
-          <Chip key={String(sp)} label={sp === null ? 'No limit' : `${sp}`} selected={spots === sp} onPress={() => setSpots(sp)} />
+          <Chip key={String(sp)} label={sp === null ? 'No limit' : `${sp}`} selected={spots === sp} onPress={() => setValue('spots', sp)} />
         ))}
       </View>
         </>
@@ -362,7 +359,6 @@ export default function SendRoam() {
   );
 }
 
-/** A radio card: a label and a small line under it. */
 function Option({ label, sub, on, color, onPress, style }: { label: string; sub: string; on: boolean; color: string; onPress: () => void; style: ViewStyle }) {
   return (
     <Pressable
@@ -388,8 +384,6 @@ const row = {
   borderColor: colors.ink,
   borderRadius: 16,
 };
-
-// ─── Find a night helpers ───────────────────────────────────────
 
 /** This week and next, Monday first. Each night starts at 7pm local. */
 function twoWeeks() {

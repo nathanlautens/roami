@@ -1,25 +1,28 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { Alert, Pressable, Text, TextInput, View, type TextInputInstance } from 'react-native';
 
-import { Body, Button, Field, H1, Label, Progress, Screen, Sticker, TopBar } from '@/components/ui';
+import { Body, Button, FormField, H1, Label, Progress, Screen, Sticker, TopBar } from '@/components/ui';
+import { loginSchema } from '@/lib/schemas';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 
 // Store reviewers can't receive codes, so this one account (Supabase -> Authentication -> Users) uses a password.
 const REVIEW_EMAIL = 'review@roami.test';
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-/** Sign up or log in with an email code. After this, Face ID / fingerprint unlocks the app. */
 export default function EmailLogin() {
-  const [email, setEmail] = useState('');
+  const { control, handleSubmit, setValue, formState } = useForm({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '', code: '' },
+  });
+  const [email, password, code] = useWatch({ control, name: ['email', 'password', 'code'] });
   const [sentTo, setSentTo] = useState<string | null>(null);
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
-  const [password, setPassword] = useState('');
   const isReviewer = email.trim().toLowerCase() === REVIEW_EMAIL;
   const codeRef = useRef<TextInputInstance>(null);
+  // Autofill and the button can both fire; only check the code once.
   const verifying = useRef(false);
 
   useEffect(() => {
@@ -28,50 +31,34 @@ export default function EmailLogin() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
-  async function reviewerLogin() {
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: REVIEW_EMAIL, password });
-    setBusy(false);
-    if (error) Alert.alert('Not quite', 'Wrong password.');
-  }
-
-  async function sendCode() {
-    const clean = email.trim().toLowerCase();
-    if (clean === REVIEW_EMAIL) return reviewerLogin();
-    if (!EMAIL_RE.test(clean)) {
-      Alert.alert('Hmm', "That doesn't look like an email.");
+  const sendCode = () => handleSubmit(async ({ email, password }) => {
+    if (email === REVIEW_EMAIL) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) Alert.alert('Not quite', 'Wrong password.');
       return;
     }
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: true } });
-    setBusy(false);
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
     if (error) {
-      Alert.alert(
-        "Couldn't send your code",
-        error.message.toLowerCase().includes('rate') ? 'Too many tries. Give it a minute and try again.' : error.message,
-      );
+      Alert.alert("Couldn't send your code", error.message.toLowerCase().includes('rate') ? 'Too many tries. Give it a minute and try again.' : error.message);
       return;
     }
-    setSentTo(clean);
-    setCode('');
+    setSentTo(email);
+    setValue('code', '');
     setResendIn(60);
     setTimeout(() => codeRef.current?.focus(), 300);
-  }
+  })();
 
-  async function verify(token = code) {
-    // Autofill and the button can both fire; only check the code once.
-    if (!sentTo || token.length !== 6 || verifying.current) return;
+  // On success the auth guard moves you on automatically.
+  const verify = () => handleSubmit(async ({ code }) => {
+    if (!sentTo || code.length !== 6 || verifying.current) return;
     verifying.current = true;
-    setBusy(true);
-    const { error } = await supabase.auth.verifyOtp({ email: sentTo, token, type: 'email' });
+    const { error } = await supabase.auth.verifyOtp({ email: sentTo, token: code, type: 'email' });
     verifying.current = false;
-    setBusy(false);
     if (error) {
       Alert.alert('Not quite', "That code didn't work. Check your email and try again.");
-      setCode('');
+      setValue('code', '');
     }
-    // On success the auth guard moves you on automatically.
-  }
+  })();
 
   const digits = code.split('');
 
@@ -79,11 +66,11 @@ export default function EmailLogin() {
     <Screen keyboard
       footer={
         sentTo ? (
-          <Button label="Let me in" onPress={() => verify()} loading={busy} disabled={code.length !== 6} />
+          <Button label="Let me in" onPress={verify} loading={formState.isSubmitting} disabled={code.length !== 6} />
         ) : isReviewer ? (
-          <Button label="Sign in" onPress={reviewerLogin} loading={busy} disabled={!password} />
+          <Button label="Sign in" onPress={sendCode} loading={formState.isSubmitting} disabled={!password} />
         ) : (
-          <Button label="Email me a code" onPress={sendCode} loading={busy} disabled={!email.trim()} />
+          <Button label="Email me a code" onPress={sendCode} loading={formState.isSubmitting} disabled={!email.trim()} />
         )
       }>
       <TopBar onBack={() => router.back()} right={<Progress step={0} of={3} />} />
@@ -94,12 +81,10 @@ export default function EmailLogin() {
 
       <Label>Email</Label>
       <View style={{ marginTop: 8 }}>
-        <Field
-          value={email}
-          onChangeText={(t) => {
-            setEmail(t);
-            if (sentTo) setSentTo(null);
-          }}
+        <FormField
+          control={control}
+          name="email"
+          onChangeText={() => sentTo && setSentTo(null)}
           placeholder="you@example.com"
           keyboardType="email-address"
           textContentType="emailAddress"
@@ -116,14 +101,14 @@ export default function EmailLogin() {
         <View style={{ marginTop: 20 }}>
           <Label>Password</Label>
           <View style={{ marginTop: 8 }}>
-            <Field
-              value={password}
-              onChangeText={setPassword}
+            <FormField
+              control={control}
+              name="password"
               secureTextEntry
               autoCapitalize="none"
               accessibilityLabel="Password"
               returnKeyType="done"
-              onSubmitEditing={reviewerLogin}
+              onSubmitEditing={sendCode}
             />
           </View>
         </View>
@@ -162,20 +147,26 @@ export default function EmailLogin() {
             })}
           </Pressable>
           {/* One real input behind the six boxes, so autofill from Mail works. */}
-          <TextInput
-            ref={codeRef}
-            value={code}
-            onChangeText={(t) => {
-              const clean = t.replace(/\D/g, '').slice(0, 6);
-              setCode(clean);
-              if (clean.length === 6) verify(clean);
-            }}
-            keyboardType="number-pad"
-            textContentType="oneTimeCode"
-            autoComplete="one-time-code"
-            maxLength={6}
-            style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
-            accessibilityLabel="Verification code"
+          <Controller
+            control={control}
+            name="code"
+            render={({ field }) => (
+              <TextInput
+                ref={codeRef}
+                value={field.value}
+                onChangeText={(t) => {
+                  const clean = t.replace(/\D/g, '').slice(0, 6);
+                  field.onChange(clean);
+                  if (clean.length === 6) verify();
+                }}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                autoComplete="one-time-code"
+                maxLength={6}
+                style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
+                accessibilityLabel="Verification code"
+              />
+            )}
           />
 
           <View style={{ marginTop: 6 }}>
@@ -190,6 +181,5 @@ export default function EmailLogin() {
         </Sticker>
       ) : null}
     </Screen>
-
   );
 }

@@ -1,19 +1,21 @@
 import * as Haptics from 'expo-haptics';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { CheckIcon } from '@/components/icons';
-import { Avatar, Body, Button, H1, Label, Loading, NotFound, Screen, Sticker, Tag, TopBar } from '@/components/ui';
+import { Avatar, Body, Button, FormField, H1, Label, Loading, NotFound, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { buzzerIn, nightDayName, nightLong, openRoamError, standings, useOpenRoam, useTick, type OpenRoam } from '@/lib/open-roams';
 import { DAYS, toggled, vibeLabel, VIBES } from '@/lib/roams';
 import { busyLabel } from '@/lib/calendar';
 import { invalidate } from '@/lib/query';
+import { pitchSchema, voteSchema } from '@/lib/schemas';
 import { supabase } from '@/lib/supabase';
 import { busyOnNight, useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
-import type { Vibe } from '@/lib/types';
 
 export default function OpenRoamScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,17 +41,21 @@ export default function OpenRoamScreen() {
   return <Vote key={o.id} o={o} me={me} now={now} reload={reload} />;
 }
 
-// ─── Voting ─────────────────────────────────────────────────────
-
 function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; reload: () => void }) {
   const amHost = o.host_id === me;
   const iVoted = !!o.people.find((p) => p.user_id === me)?.voted_at;
-  const [nights, setNights] = useState<Set<string>>(
-    () => new Set(o.nightVotes.filter((v) => v.user_id === me).map((v) => v.night_start)),
-  );
-  const [vibes, setVibes] = useState<Set<Vibe>>(() => new Set(o.vibeVotes.filter((v) => v.user_id === me).map((v) => v.vibe)));
-  const [pitch, setPitch] = useState('');
-  const [saving, setSaving] = useState(false);
+  const vote = useForm({
+    resolver: zodResolver(voteSchema),
+    defaultValues: {
+      nights: o.nightVotes.filter((v) => v.user_id === me).map((v) => v.night_start),
+      vibes: o.vibeVotes.filter((v) => v.user_id === me).map((v) => v.vibe),
+    },
+  });
+  const picked = useWatch({ control: vote.control });
+  const nights = new Set(picked.nights);
+  const vibes = new Set(picked.vibes);
+  const idea = useForm({ resolver: zodResolver(pitchSchema), defaultValues: { text: '' } });
+  const pitch = useWatch({ control: idea.control, name: 'text' });
   const [busyIdea, setBusyIdea] = useState<string | null>(null);
 
   // Everyone else's votes, plus mine as currently ticked (so counts move as you tap).
@@ -60,34 +66,29 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
   });
   const maxFree = Math.max(1, ...o.nights.map((n) => s.freeBy.get(n)?.length ?? 0));
 
-  // What's already on your calendar on each night (if you've turned that on).
   const firstNight = o.nights[0] ? new Date(o.nights[0]) : null;
   const lastNight = o.nights.at(-1) ? new Date(new Date(o.nights.at(-1)!).getTime() + 6 * 3600_000) : null;
   const calBusy = useBusy(firstNight ? new Date(firstNight.getTime() - 2 * 3600_000) : null, lastNight);
   const profileOf = (uid: string) => o.people.find((p) => p.user_id === uid)?.profile;
 
-  function toggle<T>(set: Set<T>, setter: (s: Set<T>) => void, v: T) {
+  function tap(apply: () => void) {
     Haptics.selectionAsync().catch(() => {});
-    setter(toggled(set, v));
+    apply();
   }
 
-  async function save() {
-    setSaving(true);
-    const { error } = await supabase.rpc('vote_open_roam', { p_open: o.id, p_nights: [...nights], p_vibes: [...vibes] });
-    setSaving(false);
-    if (error) {
-      Alert.alert('Hmm', openRoamError(error));
-      return;
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    Alert.alert(
-      nights.size ? 'Votes locked in' : 'Noted',
-      nights.size ? `We'll buzz you when it's decided. ${buzzerIn(o.buzzer_at, now)}.` : "None of those nights work for you. No stress, there's always next time.",
-    );
-    reload();
-    invalidate('openRoams');
-    router.back();
-  }
+  const save = () =>
+    vote.handleSubmit(async ({ nights, vibes }) => {
+      const { error } = await supabase.rpc('vote_open_roam', { p_open: o.id, p_nights: nights, p_vibes: vibes });
+      if (error) return Alert.alert('Hmm', openRoamError(error));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert(
+        nights.length ? 'Votes locked in' : 'Noted',
+        nights.length ? `We'll buzz you when it's decided. ${buzzerIn(o.buzzer_at, now)}.` : "None of those nights work for you. No stress, there's always next time.",
+      );
+      reload();
+      invalidate('openRoams');
+      router.back();
+    })();
 
   async function upvote(ideaId: string) {
     setBusyIdea(ideaId);
@@ -98,17 +99,13 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
     reload();
   }
 
-  async function addIdea() {
-    const text = pitch.trim();
-    if (!text) return;
-    const { error } = await supabase.rpc('pitch_open_roam_idea', { p_open: o.id, p_text: text });
-    if (error) {
-      Alert.alert('Hmm', openRoamError(error));
-      return;
-    }
-    setPitch('');
-    reload();
-  }
+  const addIdea = () =>
+    idea.handleSubmit(async ({ text }) => {
+      const { error } = await supabase.rpc('pitch_open_roam_idea', { p_open: o.id, p_text: text });
+      if (error) return Alert.alert('Hmm', openRoamError(error));
+      idea.reset();
+      reload();
+    })();
 
   return (
     <Screen keyboard
@@ -116,7 +113,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
         <Button
           label={iVoted && !amHost ? 'Update my votes' : amHost ? 'Save my picks' : 'Lock in my votes'}
           onPress={save}
-          loading={saving}
+          loading={vote.formState.isSubmitting}
         />
       }>
       <TopBar onBack={() => router.back()} right={<Tag label={buzzerIn(o.buzzer_at, now)} color={colors.yellow} />} />
@@ -150,7 +147,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
               accessibilityRole="checkbox"
               accessibilityState={{ checked: on }}
               accessibilityLabel={`${nightLong(n)}, ${free.length} free`}
-              onPress={() => toggle(nights, setNights, n)}
+              onPress={() => tap(() => vote.setValue('nights', [...toggled(nights, n)]))}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderWidth: border, borderColor: colors.ink, borderRadius: radius.md, backgroundColor: on ? colors.white : colors.ground }}>
               <View style={{ width: 50, alignItems: 'center' }}>
                 <Text style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.ink }}>{DAYS[d.getDay()].toUpperCase()}</Text>
@@ -188,7 +185,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
               key={v.id}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: on }}
-              onPress={() => toggle(vibes, setVibes, v.id)}
+              onPress={() => tap(() => vote.setValue('vibes', [...toggled(vibes, v.id)]))}
               style={{ minHeight: 38, paddingHorizontal: 12, borderWidth: 2, borderColor: colors.ink, borderRadius: 999, backgroundColor: on ? colors.ink : colors.white, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ fontFamily: fonts.bodyBold, fontSize: 14, color: on ? colors.white : colors.ink }}>{v.label}</Text>
               {count ? <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 14, color: on ? colors.mute : colors.inkSoft }}>{count}</Text> : null}
@@ -222,18 +219,21 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
             </View>
           );
         })}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TextInput
-            value={pitch}
-            onChangeText={setPitch}
-            placeholder="Pitch an idea…"
-            placeholderTextColor="#8B82A3"
-            maxLength={60}
-            accessibilityLabel="Pitch an idea"
-            returnKeyType="done"
-            onSubmitEditing={addIdea}
-            style={{ flex: 1, minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderStyle: 'dashed', borderColor: colors.ink, borderRadius: 16, fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}
-          />
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+          <View style={{ flex: 1 }}>
+            <FormField
+              control={idea.control}
+              name="text"
+              input={TextInput}
+              placeholder="Pitch an idea…"
+              placeholderTextColor="#8B82A3"
+              maxLength={60}
+              accessibilityLabel="Pitch an idea"
+              returnKeyType="done"
+              onSubmitEditing={addIdea}
+              style={{ minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderStyle: 'dashed', borderColor: colors.ink, borderRadius: 16, fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}
+            />
+          </View>
           <Pressable
             accessibilityRole="button"
             onPress={addIdea}
@@ -247,8 +247,6 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
 
   );
 }
-
-// ─── After the buzzer ───────────────────────────────────────────
 
 function Result({ o, me }: { o: OpenRoam; me: string }) {
   if (o.status === 'expired') {

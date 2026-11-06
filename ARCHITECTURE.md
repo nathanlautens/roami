@@ -14,6 +14,7 @@ src/lib/            Everything that isn't a screen:
   realtime.ts         The one live connection that keeps the cache fresh
   data.ts             Data hooks: useFeed, useFriends, useCircles, useRoam, useArchive
   open-roams.ts       Open Roams ("find a night") hooks and buzzer rules
+  schemas.ts          Zod schemas for every form (limits match the database)
   storage.ts          On-device settings (cached key-value store)
   calendar.ts, push.ts, updates.ts, biometric.ts
 supabase/migrations Schema, privacy rules (RLS), RPCs, cron jobs, indexes
@@ -41,6 +42,12 @@ screen ──useFeed()──► useLoader(key, fetcher, placeholder, tables)
 - **Your own changes** usually arrive via realtime, but screens also call `invalidate('feed')` etc. after a mutation so they don't depend on the socket. Tables outside the publication (circles) must always be invalidated explicitly.
 
 Adding a data hook: give it a key that includes `userId` (or the record id), list the tables it reads, and invalidate it after mutations realtime won't report.
+
+## Forms
+
+Forms use react-hook-form with a Zod schema from `src/lib/schemas.ts` via `zodResolver`. Text inputs go through `FormField` (`components/ui.tsx`), which binds the input and shows its validation message underneath; chips and checkboxes call `setValue`. Read values with `useWatch`, not `watch` (the React Compiler can't optimise components that call `watch`), and call `handleSubmit` inside the press handler rather than during render. Server errors are still shown as alerts. Rules that need loaded data (e.g. "pick at least one friend") are checked in the submit handler.
+
+`metro.config.js` swaps Zod's 64-language locale bundle for English only.
 
 ## Startup
 

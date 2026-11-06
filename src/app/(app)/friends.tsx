@@ -1,14 +1,17 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { Alert, Pressable, Share, Text, TextInput, View } from 'react-native';
 
 import { MoreIcon, ShareIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
 import { TestTools } from '@/components/test-tools';
-import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
+import { Avatar, Body, Button, FormField, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useFriends } from '@/lib/data';
 import { friendlyError } from '@/lib/roams';
+import { friendCodeSchema } from '@/lib/schemas';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -42,41 +45,24 @@ export default function Friends() {
 
   // Friend codes: the first 8 characters of someone's id, e.g. "3F9A12BC".
   const myCode = userId ? userId.slice(0, 8).toUpperCase() : '';
-  const [code, setCode] = useState('');
-  const [adding, setAdding] = useState(false);
+  const { control, handleSubmit, setError, reset, formState } = useForm({ resolver: zodResolver(friendCodeSchema), defaultValues: { code: '' } });
 
-  async function addByCode() {
-    const clean = code.trim().toLowerCase().replace(/[^0-9a-f]/g, '');
-    if (clean.length !== 8) {
-      Alert.alert('Hmm', 'Friend codes are 8 letters and numbers.');
-      return;
-    }
-    if (clean === myCode.toLowerCase()) {
-      Alert.alert("That's you, babe", 'Ask your friend for their code.');
-      return;
-    }
-    setAdding(true);
-    // Looked up on the server, one person at a time (profiles aren't listable).
-    const { data } = await supabase.rpc('find_by_friend_code', { p_code: clean });
-    const found = (data ?? []) as { id: string; display_name: string }[];
-    if (found.length !== 1) {
-      setAdding(false);
-      Alert.alert('No one by that code', 'Double-check it with your friend?');
-      return;
-    }
-    const { data: status, error } = await supabase.rpc('add_friend', { p_target: found[0].id });
-    setAdding(false);
-    if (error) {
-      Alert.alert('Hmm', friendlyError(error));
-      return;
-    }
-    setCode('');
-    Alert.alert(
-      status === 'accepted' ? `You and ${found[0].display_name} are friends!` : 'Request sent',
-      status === 'accepted' ? 'Go send them a Roam.' : `Once ${found[0].display_name} adds you back, you can roam together.`,
-    );
-    reload();
-  }
+  const addByCode = () =>
+    handleSubmit(async ({ code }) => {
+      if (code === myCode.toLowerCase()) return setError('code', { message: "That's you, babe. Ask your friend for their code." });
+      // Looked up on the server, one person at a time (profiles aren't listable).
+      const { data } = await supabase.rpc('find_by_friend_code', { p_code: code });
+      const found = (data ?? []) as { id: string; display_name: string }[];
+      if (found.length !== 1) return setError('code', { message: 'No one by that code. Double-check it with your friend?' });
+      const { data: status, error } = await supabase.rpc('add_friend', { p_target: found[0].id });
+      if (error) return Alert.alert('Hmm', friendlyError(error));
+      reset();
+      Alert.alert(
+        status === 'accepted' ? `You and ${found[0].display_name} are friends!` : 'Request sent',
+        status === 'accepted' ? 'Go send them a Roam.' : `Once ${found[0].display_name} adds you back, you can roam together.`,
+      );
+      reload();
+    })();
 
   return (
     <Screen
@@ -103,22 +89,25 @@ export default function Friends() {
             <ShareIcon size={20} />
           </Pressable>
         </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TextInput
-            value={code}
-            onChangeText={setCode}
-            placeholder="Their code"
-            placeholderTextColor="#5E5670"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={9}
-            accessibilityLabel="Friend's code"
-            returnKeyType="done"
-            onSubmitEditing={addByCode}
-            style={{ flex: 1, minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderColor: colors.ink, borderRadius: radius.sm, backgroundColor: colors.white, fontFamily: fonts.bodyBold, fontSize: 17, letterSpacing: 1.5, color: colors.ink }}
-          />
-          <Pressable accessibilityRole="button" onPress={addByCode} disabled={adding} style={{ minHeight: 48, paddingHorizontal: 18, borderRadius: radius.sm, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', opacity: adding ? 0.6 : 1 }}>
-            <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lime }}>{adding ? '…' : 'Add'}</Text>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+          <View style={{ flex: 1 }}>
+            <FormField
+              control={control}
+              name="code"
+              input={TextInput}
+              placeholder="Their code"
+              placeholderTextColor="#5E5670"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={9}
+              accessibilityLabel="Friend's code"
+              returnKeyType="done"
+              onSubmitEditing={addByCode}
+              style={{ minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderColor: colors.ink, borderRadius: radius.sm, backgroundColor: colors.white, fontFamily: fonts.bodyBold, fontSize: 17, letterSpacing: 1.5, color: colors.ink }}
+            />
+          </View>
+          <Pressable accessibilityRole="button" onPress={addByCode} disabled={formState.isSubmitting} style={{ minHeight: 48, paddingHorizontal: 18, borderRadius: radius.sm, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', opacity: formState.isSubmitting ? 0.6 : 1 }}>
+            <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lime }}>{formState.isSubmitting ? '…' : 'Add'}</Text>
           </Pressable>
         </View>
       </Sticker>

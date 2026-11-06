@@ -1,11 +1,13 @@
 import * as Haptics from 'expo-haptics';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { AddPersonIcon, ClashIcon, MoreIcon, PinIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
-import { Avatar, Body, Button, Checkbox, Chip, H1, Label, Loading, NotFound, Screen, Sheet, Sticker, Tag, TopBar } from '@/components/ui';
+import { Avatar, Body, Button, Checkbox, Chip, FormField, H1, Label, Loading, NotFound, Screen, Sheet, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { findClashes, useFriends, useRoam } from '@/lib/data';
 import {
@@ -20,6 +22,7 @@ import {
 } from '@/lib/roams';
 import { busyLabel, calendarAvailable, calendarPrefs, defaultCalendarId, requestCalendarAccess, setCalendarPrefs, syncCalendar } from '@/lib/calendar';
 import { invalidate } from '@/lib/query';
+import { noteSchema } from '@/lib/schemas';
 import { supabase } from '@/lib/supabase';
 import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
@@ -40,12 +43,18 @@ export default function RoamScreen() {
   const { data, loading, error, reload } = useRoam(id);
   const { data: friends } = useFriends();
 
-  const [note, setNote] = useState<string | null>(null);
+  // Follows the saved note as data refreshes, unless you're mid-edit.
+  const noteForm = useForm({
+    resolver: zodResolver(noteSchema),
+    values: { note: data.invites.find((i) => i.user_id === me)?.note ?? '' },
+    resetOptions: { keepDirtyValues: true },
+  });
+  const bailForm = useForm({ resolver: zodResolver(noteSchema), defaultValues: { note: BAIL_REASONS[0] } });
+  const bailNote = useWatch({ control: bailForm.control, name: 'note' });
   const [busy, setBusy] = useState<string | null>(null);
   const [clashes, setClashes] = useState<Roam[] | null>(null);
   const [skip, setSkip] = useState<string | null>(null);
   const [bailOpen, setBailOpen] = useState(false);
-  const [bailNote, setBailNote] = useState(BAIL_REASONS[0]);
   const [bringOpen, setBringOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
 
@@ -65,7 +74,6 @@ export default function RoamScreen() {
   const state = roamState(roam, ins.length);
   const active = isActive(roam);
   const vibe = vibeLabel(roam.vibe);
-  const noteValue = note ?? mine?.note ?? '';
 
   async function run(key: string, fn: () => PromiseLike<{ error: unknown }>, success?: () => void) {
     setBusy(key);
@@ -83,7 +91,7 @@ export default function RoamScreen() {
   }
 
   const respond = (response: Response, roamId = roam.id) =>
-    run(response, () => supabase.rpc('respond_to_roam', { p_roam: roamId, p_response: response, p_note: noteValue || null }));
+    run(response, () => supabase.rpc('respond_to_roam', { p_roam: roamId, p_response: response, p_note: noteForm.getValues('note').trim() || null }));
 
   async function answer(response: Response) {
     if (busy) return; // one answer at a time
@@ -105,7 +113,6 @@ export default function RoamScreen() {
     }
   }
 
-  // Once: "Want Roams you're in on added to your calendar?"
   function offerCalendar() {
     if (!calendarAvailable || calendarPrefs().asked) return;
     Alert.alert('Add it to your calendar?', "We'll add Roams you're in on, and take them off if plans change.", [
@@ -138,25 +145,28 @@ export default function RoamScreen() {
     await respond('in');
   }
 
-  async function hostBail() {
-    setBailOpen(false);
-    setBusy('bail');
-    const { data: status, error } = await supabase.rpc('host_cant_make_it', { p_roam: roam!.id, p_note: bailNote || null });
-    setBusy(null);
-    if (error) {
-      Alert.alert('Hmm', friendlyError(error));
-      return;
-    }
-    Alert.alert(
-      status === 'up_for_grabs' ? "It's up for grabs" : 'Called off',
-      status === 'up_for_grabs'
-        ? "Everyone who's in can take over as host. No hard feelings."
-        : 'Nobody was in yet, so it quietly disappears.',
-    );
-    reload();
-    invalidate('feed');
-    syncCalendar(me); // you're out, so it comes off your calendar
-  }
+  const hostBail = () =>
+    bailForm.handleSubmit(async ({ note }) => {
+      setBailOpen(false);
+      setBusy('bail');
+      const { data: status, error } = await supabase.rpc('host_cant_make_it', { p_roam: roam.id, p_note: note || null });
+      setBusy(null);
+      if (error) return Alert.alert('Hmm', friendlyError(error));
+      Alert.alert(
+        status === 'up_for_grabs' ? "It's up for grabs" : 'Called off',
+        status === 'up_for_grabs' ? "Everyone who's in can take over as host. No hard feelings." : 'Nobody was in yet, so it quietly disappears.',
+      );
+      reload();
+      invalidate('feed');
+      syncCalendar(me); // you're out, so it comes off your calendar
+    })();
+
+  // Saves the note with your actual answer (not an expired Maybe shown as Can't).
+  const saveNote = () =>
+    noteForm.handleSubmit(async ({ note }) => {
+      if (!mine?.response || !noteForm.formState.isDirty) return;
+      if (await respond(mine.response)) noteForm.reset({ note });
+    })();
 
   async function bring(friendId: string) {
     setBringOpen(false);
@@ -196,7 +206,6 @@ export default function RoamScreen() {
           }
         />
   
-        {/* The Roam */}
         <Sticker
           color={state === 'up_for_grabs' ? colors.yellow : amHost ? colors.lime : colors.pink}
           offset={6}
@@ -249,7 +258,6 @@ export default function RoamScreen() {
           </Sticker>
         ) : null}
   
-        {/* Who's in */}
         <Label style={{ marginTop: 26 }}>Who's in · {ins.length}</Label>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, marginTop: 10 }}>
           {ins.map((i) => (
@@ -282,7 +290,6 @@ export default function RoamScreen() {
           </View>
         ) : null}
   
-        {/* Host-only view */}
         {amHost && active ? (
           <View style={{ marginTop: 22, gap: 18 }}>
             {data.requests.length ? (
@@ -308,7 +315,6 @@ export default function RoamScreen() {
           </View>
         ) : null}
   
-        {/* Up for grabs: anyone who's In can take over */}
         {!amHost && state === 'up_for_grabs' && myResponse === 'in' ? (
           <View style={{ marginTop: 22, gap: 10 }}>
             <Label>What now?</Label>
@@ -318,7 +324,6 @@ export default function RoamScreen() {
           </View>
         ) : null}
   
-        {/* Invitee: answer */}
         {!amHost && active && roam.status === 'live' ? (
           <View style={{ marginTop: 26, gap: 10 }}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -341,11 +346,11 @@ export default function RoamScreen() {
                 );
               })}
             </View>
-            <TextInput
-              value={noteValue}
-              onChangeText={setNote}
-              // Saves the note with your actual answer (not an expired Maybe shown as Can't).
-              onEndEditing={() => mine?.response && note !== null && note !== (mine.note ?? '') && respond(mine.response)}
+            <FormField
+              control={noteForm.control}
+              name="note"
+              input={TextInput}
+              onEndEditing={saveNote}
               placeholder="Add a note… (optional)"
               placeholderTextColor="#8B82A3"
               maxLength={80}
@@ -371,7 +376,6 @@ export default function RoamScreen() {
         ) : null}
       </Screen>
   
-      {/* Double-booked */}
       <Sheet visible={!!clashes} onClose={() => setClashes(null)}>
         <View style={{ alignItems: 'center', marginTop: 6 }}>
           <Sticker color={colors.yellow} offset={4} rotate={8} innerStyle={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
@@ -410,7 +414,6 @@ export default function RoamScreen() {
         </View>
       </Sheet>
   
-      {/* Host can't make it */}
       <Sheet visible={bailOpen} onClose={() => setBailOpen(false)}>
         <H1 style={{ fontSize: 30, lineHeight: 32 }}>Can't make it?</H1>
         <Body style={{ marginTop: 8, marginBottom: 16 }}>
@@ -420,23 +423,24 @@ export default function RoamScreen() {
         </Body>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
           {BAIL_REASONS.map((r) => (
-            <Chip key={r} label={r} selected={bailNote === r} onPress={() => setBailNote(r)} />
+            <Chip key={r} label={r} selected={bailNote === r} onPress={() => bailForm.setValue('note', r)} />
           ))}
         </View>
-        <TextInput
-          value={bailNote}
-          onChangeText={setBailNote}
+        <FormField
+          control={bailForm.control}
+          name="note"
+          input={TextInput}
           maxLength={80}
           placeholder="Or say why…"
           placeholderTextColor="#8B82A3"
           accessibilityLabel="Reason"
-          style={{ minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderColor: colors.ink, borderRadius: 16, backgroundColor: colors.white, fontFamily: fonts.body, fontSize: 15, color: colors.ink, marginBottom: 18 }}
+          style={{ minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderColor: colors.ink, borderRadius: 16, backgroundColor: colors.white, fontFamily: fonts.body, fontSize: 15, color: colors.ink, }}
         />
+        <View style={{ height: 18 }} />
         <Button label={ins.length > 1 ? 'Hand it over' : 'Call it off'} onPress={hostBail} />
         <Button variant="link" label="Actually, I'm still going" onPress={() => setBailOpen(false)} />
       </Sheet>
   
-      {/* Bring someone */}
       <Sheet visible={bringOpen} onClose={() => setBringOpen(false)}>
         <H1 style={{ fontSize: 30, lineHeight: 32 }}>Bring someone?</H1>
         <Body style={{ marginTop: 8, marginBottom: 16 }}>Pick a friend. {roam.host?.display_name ?? 'The host'} gets the final say.</Body>

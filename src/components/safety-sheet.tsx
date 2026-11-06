@@ -1,19 +1,14 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { invalidate } from '@/lib/query';
+import { REPORT_REASONS, reportSchema } from '@/lib/schemas';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
-import { Body, Button, Sheet } from './ui';
-
-const REASONS: { id: string; label: string }[] = [
-  { id: 'harassment', label: 'Being mean or harassing' },
-  { id: 'inappropriate', label: 'Inappropriate stuff' },
-  { id: 'spam', label: 'Spam' },
-  { id: 'fake', label: 'Fake account' },
-  { id: 'other', label: 'Something else' },
-];
+import { Body, Button, FormField, Sheet } from './ui';
 
 /**
  * Report and/or block. Pass a person (block + report them), a Roam (report it),
@@ -33,38 +28,26 @@ export function SafetySheet({
   onBlocked?: () => void;
 }) {
   const [step, setStep] = useState<'menu' | 'report'>('menu');
-  const [reason, setReason] = useState<string | null>(null);
-  const [details, setDetails] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { control, handleSubmit, setValue, reset, formState } = useForm({ resolver: zodResolver(reportSchema), defaultValues: { details: '' } });
+  const reason = useWatch({ control, name: 'reason' });
   const name = person?.display_name ?? 'them';
 
   function close() {
     setStep('menu');
-    setReason(null);
-    setDetails('');
+    reset();
     onClose();
   }
 
-  async function sendReport() {
-    if (!reason) return;
-    setBusy(true);
-    const { error } = await supabase.rpc('report', {
-      p_user: person?.id ?? null,
-      p_roam: roamId ?? null,
-      p_reason: reason,
-      p_details: details.trim() || null,
-    });
-    setBusy(false);
-    if (error) {
-      Alert.alert("Couldn't send that", error.message.includes('too_many') ? 'Slow down a sec and try again later.' : 'Try again?');
-      return;
-    }
-    close();
-    Alert.alert(
-      'Thanks for telling us',
-      person ? `We'll take a look. Want to block ${name} too? You can do that from the same menu.` : "We'll take a look.",
-    );
-  }
+  const sendReport = () =>
+    handleSubmit(async ({ reason, details }) => {
+      const { error } = await supabase.rpc('report', { p_user: person?.id ?? null, p_roam: roamId ?? null, p_reason: reason, p_details: details || null });
+      if (error) {
+        Alert.alert("Couldn't send that", error.message.includes('too_many') ? 'Slow down a sec and try again later.' : 'Try again?');
+        return;
+      }
+      close();
+      Alert.alert('Thanks for telling us', person ? `We'll take a look. Want to block ${name} too? You can do that from the same menu.` : "We'll take a look.");
+    })();
 
   function block() {
     if (!person) return;
@@ -106,14 +89,14 @@ export function SafetySheet({
       ) : (
         <View style={{ gap: 10 }}>
           <Text style={{ fontFamily: fonts.display, fontSize: 26, color: colors.ink }}>What's going on?</Text>
-          {REASONS.map((r) => {
+          {REPORT_REASONS.map((r) => {
             const on = reason === r.id;
             return (
               <Pressable
                 key={r.id}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: on }}
-                onPress={() => setReason(r.id)}
+                onPress={() => setValue('reason', r.id)}
                 style={{
                   minHeight: 48,
                   paddingHorizontal: 14,
@@ -127,9 +110,10 @@ export function SafetySheet({
               </Pressable>
             );
           })}
-          <TextInput
-            value={details}
-            onChangeText={setDetails}
+          <FormField
+            control={control}
+            name="details"
+            input={TextInput}
             placeholder="Anything else we should know? (optional)"
             placeholderTextColor="#8B82A3"
             maxLength={500}
@@ -137,7 +121,7 @@ export function SafetySheet({
             accessibilityLabel="More details"
             style={{ minHeight: 72, padding: 12, borderWidth: border, borderColor: colors.ink, borderRadius: radius.md, backgroundColor: colors.white, fontFamily: fonts.body, fontSize: 15, color: colors.ink, textAlignVertical: 'top' }}
           />
-          <Button label="Send report" onPress={sendReport} loading={busy} disabled={!reason} />
+          <Button label="Send report" onPress={sendReport} loading={formState.isSubmitting} disabled={!reason} />
           <Button variant="link" label="Back" onPress={() => setStep('menu')} />
         </View>
       )}
