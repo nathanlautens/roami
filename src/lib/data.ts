@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { alertError } from './alerts';
 import { useAuth } from './auth';
 import { supabase } from './supabase';
 import type { Circle, Invite, InviteRequest, Profile, Roam } from './types';
@@ -89,6 +90,16 @@ export function useFriends() {
     { friends: [], incoming: [], outgoing: [] },
     ['friendships'],
   );
+}
+
+/** Sends (or accepts) a friend request. Shows the error and returns null if it fails. */
+export async function addFriend(id: string): Promise<'requested' | 'accepted' | null> {
+  const { data, error } = await supabase.rpc('add_friend', { p_target: id });
+  if (error) {
+    alertError(error);
+    return null;
+  }
+  return data as 'requested' | 'accepted';
 }
 
 // ─── Circles ──────────────────────────────────────────────────────

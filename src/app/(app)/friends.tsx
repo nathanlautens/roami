@@ -7,8 +7,7 @@ import { SafetySheet } from '@/components/safety-sheet';
 import { TestTools } from '@/components/test-tools';
 import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { useFriends } from '@/lib/data';
-import { friendlyError } from '@/lib/roams';
+import { addFriend, useFriends } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -20,12 +19,10 @@ export default function Friends() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [safetyFor, setSafetyFor] = useState<Profile | null>(null);
 
-
   async function add(id: string) {
     setBusyId(id);
-    const { error } = await supabase.rpc('add_friend', { p_target: id });
+    await addFriend(id);
     setBusyId(null);
-    if (error) Alert.alert('Hmm', friendlyError(error));
     reload();
   }
 
@@ -64,12 +61,9 @@ export default function Friends() {
       Alert.alert('No one by that code', 'Double-check it with your friend?');
       return;
     }
-    const { data: status, error } = await supabase.rpc('add_friend', { p_target: found[0].id });
+    const status = await addFriend(found[0].id);
     setAdding(false);
-    if (error) {
-      Alert.alert('Hmm', friendlyError(error));
-      return;
-    }
+    if (!status) return;
     setCode('');
     Alert.alert(
       status === 'accepted' ? `You and ${found[0].display_name} are friends!` : 'Request sent',

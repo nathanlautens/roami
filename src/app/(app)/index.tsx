@@ -14,14 +14,12 @@ import { Avatar, Body, Button, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { syncCalendar } from '@/lib/calendar';
 import { SKIP_LOGIN } from '@/lib/config';
-import { useAppLocked } from '@/lib/lock';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
+import { DAYS, MONTHS } from '@/lib/format';
+import { useAppLocked } from '@/lib/lock';
 import { markBuzzerSeen, resolveDue, seenBuzzers, useOpenRoams, useTick } from '@/lib/open-roams';
 import { effectiveResponse, isActive } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
-
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function Feed() {
   const { profile, userId } = useAuth();

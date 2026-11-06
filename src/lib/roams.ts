@@ -1,3 +1,4 @@
+import { clock, DAY, DAYS, HOUR, MINUTE, splitMinutes } from './format';
 import type { Invite, Response, Roam, Vibe } from './types';
 
 export const VIBES: { id: Vibe; label: string }[] = [
@@ -49,12 +50,12 @@ export function windowFor(id: WhenId, now = new Date()): { start: Date; end: Dat
   const lateTonight = at(now, 23, 59);
   switch (id) {
     case 'now':
-      return { start: now, end: new Date(now.getTime() + 3 * 3600_000) };
+      return { start: now, end: new Date(now.getTime() + 3 * HOUR) };
     case 'tonight': {
       const six = at(now, 18);
       const start = now > six ? now : six;
       // Already late? Run tonight into the small hours.
-      const end = start.getHours() >= 22 ? new Date(start.getTime() + 3 * 3600_000) : lateTonight;
+      const end = start.getHours() >= 22 ? new Date(start.getTime() + 3 * HOUR) : lateTonight;
       return { start, end };
     }
     case 'tomorrow': {
@@ -97,35 +98,21 @@ export const STATE_LABEL: Record<RoamState, string> = {
 
 /** A Maybe quietly becomes a Can't an hour before the start. */
 export function effectiveResponse(inv: Pick<Invite, 'response'>, roam: Roam, now = new Date()): Response | null {
-  if (inv.response === 'maybe' && now.getTime() > new Date(roam.starts_at).getTime() - 3600_000) {
+  if (inv.response === 'maybe' && now.getTime() > new Date(roam.starts_at).getTime() - HOUR) {
     return 'cant';
   }
   return inv.response;
 }
 
-export function isActive(roam: Roam, now = new Date()) {
+export function isActive(roam: Pick<Roam, 'status' | 'ends_at'>, now = new Date()) {
   return roam.status !== 'cancelled' && new Date(roam.ends_at) > now;
-}
-
-export function overlaps(a: Roam, b: Roam) {
-  return new Date(a.starts_at) < new Date(b.ends_at) && new Date(b.starts_at) < new Date(a.ends_at);
 }
 
 // ─── Formatting ─────────────────────────────────────────────────
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-function clock(d: Date) {
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const suffix = h >= 12 ? 'pm' : 'am';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
-}
-
 function dayWord(d: Date, now: Date) {
   const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((startOf(d) - startOf(now)) / 86_400_000);
+  const diff = Math.round((startOf(d) - startOf(now)) / DAY);
   if (diff === 0) return d.getHours() >= 17 ? 'Tonight' : 'Today';
   if (diff === 1) return 'Tomorrow';
   if (diff === -1) return 'Yesterday';
@@ -143,17 +130,17 @@ export function formatWhen(roam: Pick<Roam, 'starts_at' | 'ends_at'>, now = new 
 }
 
 export function startsIn(roam: Roam, now = new Date()) {
-  const mins = Math.round((new Date(roam.starts_at).getTime() - now.getTime()) / 60_000);
+  const mins = Math.round((new Date(roam.starts_at).getTime() - now.getTime()) / MINUTE);
   if (mins <= 0) return 'Happening now';
   if (mins < 60) return `Starts in ${mins}m`;
-  const h = Math.floor(mins / 60);
-  if (h < 24) return `Starts in ${h}h ${mins % 60}m`;
+  const { h, m } = splitMinutes(mins);
+  if (h < 24) return `Starts in ${h}h ${m}m`;
   return `Starts in ${Math.round(h / 24)}d`;
 }
 
 export function daysAgo(iso: string | null, now = new Date()) {
   if (!iso) return 'never roamed yet';
-  const d = Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000);
+  const d = Math.floor((now.getTime() - new Date(iso).getTime()) / DAY);
   if (d <= 0) return 'last roamed today';
   if (d === 1) return 'last roamed yesterday';
   return `last roamed ${d} days ago`;
@@ -162,7 +149,7 @@ export function daysAgo(iso: string | null, now = new Date()) {
 /** Circles you haven't roamed with in two weeks get a nudge. */
 export function isStale(iso: string | null, now = new Date()) {
   if (!iso) return true;
-  return now.getTime() - new Date(iso).getTime() > 14 * 86_400_000;
+  return now.getTime() - new Date(iso).getTime() > 14 * DAY;
 }
 
 // ─── Errors from the database, in Roami's voice ─────────────────
@@ -189,8 +176,15 @@ const ERRORS: Record<string, string> = {
   invalid_avatar: 'That photo needs uploading again.',
 };
 
-export function friendlyError(e: unknown): string {
+export const GENERIC_ERROR = 'Something went sideways. Try again?';
+
+/** Turns a database error code inside `e` into a friendly line from `messages`. */
+export function matchError(messages: Record<string, string>, e: unknown): string {
   const msg = (e as { message?: string })?.message ?? String(e);
-  const key = Object.keys(ERRORS).find((k) => msg.includes(k));
-  return key ? ERRORS[key] : 'Something went sideways. Try again?';
+  const key = Object.keys(messages).find((k) => msg.includes(k));
+  return key ? messages[key] : GENERIC_ERROR;
+}
+
+export function friendlyError(e: unknown): string {
+  return matchError(ERRORS, e);
 }

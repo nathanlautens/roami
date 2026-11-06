@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { displayName } from '@/lib/format';
 import { avatarColors, border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
 import { BackIcon, CheckIcon, CloseIcon } from './icons';
@@ -341,7 +342,7 @@ export function AvatarStack({ people, size = 30 }: { people: (Profile | null | u
 }
 
 export function namesIn(people: (Profile | null | undefined)[], me?: string | null) {
-  const names = people.map((p) => (p?.id === me ? 'You' : p?.display_name ?? 'Someone'));
+  const names = people.map((p) => displayName(p, me, 'Someone'));
   if (names.length === 0) return 'Nobody yet';
   if (names.length === 1) return `${names[0]} is in`;
   if (names.length === 2) return `${names[0]} + ${names[1]} are in`;

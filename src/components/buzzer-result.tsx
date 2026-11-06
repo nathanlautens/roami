@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { nightDayName, nightLong, vibeName, type OpenRoam } from '@/lib/open-roams';
+import { nightDayName, nightLong, type OpenRoam } from '@/lib/open-roams';
+import { vibeLabel } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
 import { Avatar, Button, Sticker } from './ui';
 
@@ -34,7 +35,7 @@ export function BuzzerResult({ o, me, onClose }: { o: OpenRoam; me: string; onCl
   const cantMake = o.people.filter((p) => !freeIds.has(p.user_id));
   const iAmIn = freeIds.has(me);
   const amHost = o.host_id === me;
-  const vibe = vibeName(o.winning_vibe);
+  const vibe = vibeLabel(o.winning_vibe);
 
   const seeRoam = () => {
     onClose();

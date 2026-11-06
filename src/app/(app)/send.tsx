@@ -9,8 +9,9 @@ import { useCircles, useFriends } from '@/lib/data';
 import { daysAgo, friendlyError, isStale, PROMPTS, VIBES, WHENS, windowFor, type WhenId } from '@/lib/roams';
 import { celebrateSent } from '@/lib/celebrate';
 import { openRoamError } from '@/lib/open-roams';
+import { eventsOnNight, useCalendarBusy } from '@/lib/calendar';
+import { HOUR, LONG_MONTHS, MINUTE, people as peopleCount } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Vibe } from '@/lib/types';
 
@@ -35,15 +36,11 @@ export default function SendRoam() {
   // Find a night
   const [days] = useState(() => twoWeeks());
   // Dots on nights you already have plans (if calendar checks are on).
-  const calBusy = useBusy(
-    mode === 'find' ? new Date(new Date(days[0].iso).getTime() - 19 * 3600_000) : null,
-    mode === 'find' ? new Date(new Date(days[13].iso).getTime() + 5 * 3600_000) : null,
+  const calBusy = useCalendarBusy(
+    mode === 'find' ? new Date(new Date(days[0].iso).getTime() - 19 * HOUR) : null,
+    mode === 'find' ? new Date(new Date(days[13].iso).getTime() + 5 * HOUR) : null,
   );
-  const busyNight = (iso: string) => {
-    const start = new Date(iso).getTime() - 2 * 3600_000;
-    const end = new Date(iso).getTime() + 5 * 3600_000;
-    return (calBusy ?? []).some((e) => e.start.getTime() < end && e.end.getTime() > start);
-  };
+  const busyNight = (iso: string) => eventsOnNight(calBusy, iso).length > 0;
   const [nights, setNights] = useState<Set<string>>(new Set());
   const [buzzerId, setBuzzerId] = useState<string | null>(null);
   const [idea, setIdea] = useState('');
@@ -125,10 +122,10 @@ export default function SendRoam() {
           ? 'Pick your nights'
           : !buzzer
             ? 'Nights are too soon for a buzzer'
-            : `Start the vote · ${n} ${n === 1 ? 'person' : 'people'}`
+            : `Start the vote · ${peopleCount(n)}`
         : !what.trim()
           ? "What's the plan?"
-          : `Send it to ${n} ${n === 1 ? 'person' : 'people'}`;
+          : `Send it to ${peopleCount(n)}`;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -417,8 +414,6 @@ const row = {
 
 // ─── Find a night helpers ───────────────────────────────────────
 
-const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
 /** This week and next, Monday first. Each night starts at 7pm local. */
 function twoWeeks() {
   const now = new Date();
@@ -429,7 +424,7 @@ function twoWeeks() {
       iso: d.toISOString(),
       num: d.getDate(),
       past: d.getTime() <= now.getTime(),
-      label: `${d.getDate()} ${MONTHS_LONG[d.getMonth()]}`,
+      label: `${d.getDate()} ${LONG_MONTHS[d.getMonth()]}`,
     };
   });
 }
@@ -441,8 +436,8 @@ function buzzerOptions(firstNight: Date | null) {
   const at = (days: number, h: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, h, 0, 0, 0);
   const nightBefore = new Date(firstNight.getFullYear(), firstNight.getMonth(), firstNight.getDate() - 1, 18, 0, 0, 0);
   const all = [
-    ...(__DEV__ ? [{ id: 'test', label: 'In 2 min', sub: 'test mode', at: new Date(now.getTime() + 2 * 60_000) }] : []),
-    { id: 'soon', label: 'In 2 hours', sub: '', at: new Date(now.getTime() + 2 * 3600_000) },
+    ...(__DEV__ ? [{ id: 'test', label: 'In 2 min', sub: 'test mode', at: new Date(now.getTime() + 2 * MINUTE) }] : []),
+    { id: 'soon', label: 'In 2 hours', sub: '', at: new Date(now.getTime() + 2 * HOUR) },
     { id: 'tonight', label: 'Tonight', sub: '9pm', at: at(0, 21) },
     { id: 'tomorrow', label: 'Tomorrow', sub: '12pm', at: at(1, 12) },
     { id: 'nightBefore', label: 'Night before', sub: '6pm', at: nightBefore },
@@ -450,7 +445,7 @@ function buzzerOptions(firstNight: Date | null) {
   const seen = new Set<number>();
   return all.filter((b) => {
     const t = b.at.getTime();
-    if (t <= now.getTime() + 60_000 || t > firstNight.getTime() || seen.has(t)) return false;
+    if (t <= now.getTime() + MINUTE || t > firstNight.getTime() || seen.has(t)) return false;
     seen.add(t);
     return true;
   });

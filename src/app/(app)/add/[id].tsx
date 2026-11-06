@@ -1,10 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Avatar, Body, Button, H1, Screen, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { friendlyError } from '@/lib/roams';
+import { addFriend } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
 
@@ -24,9 +24,7 @@ export default function AddFriend() {
 
   async function add() {
     setState('busy');
-    const { data, error } = await supabase.rpc('add_friend', { p_target: id });
-    setState(error ? 'idle' : (data as 'requested' | 'accepted'));
-    if (error) Alert.alert('Hmm', friendlyError(error));
+    setState((await addFriend(id)) ?? 'idle');
   }
 
   const isMe = id === userId;

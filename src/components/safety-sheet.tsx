@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
+import { friendlyError } from '@/lib/roams';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
@@ -55,7 +56,7 @@ export function SafetySheet({
     });
     setBusy(false);
     if (error) {
-      Alert.alert("Couldn't send that", error.message.includes('too_many') ? 'Slow down a sec and try again later.' : 'Try again?');
+      Alert.alert("Couldn't send that", error.message.includes('too_many_reports') ? friendlyError(error) : 'Try again?');
       return;
     }
     close();

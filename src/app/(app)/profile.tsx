@@ -7,6 +7,7 @@ import { CalendarSettings } from '@/components/calendar-settings';
 import { ProfileForm } from '@/components/profile-form';
 import { Body, Button, H1, Label, Screen, Sticker, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { removePhotos } from '@/lib/avatar';
 import {
   authenticate,
   clearUnlockPrefs,
@@ -14,6 +15,7 @@ import {
   setUnlockEnabled,
   unlockKind,
   unlockLabel,
+  type UnlockKind,
 } from '@/lib/biometric';
 import { removeAllRoamiEvents, setCalendarPrefs } from '@/lib/calendar';
 import { SKIP_LOGIN } from '@/lib/config';
@@ -22,7 +24,7 @@ import { colors, fonts } from '@/lib/theme';
 
 export default function ProfileScreen() {
   const { signOut, session, userId } = useAuth();
-  const [kind, setKind] = useState<Awaited<ReturnType<typeof unlockKind>>>(null);
+  const [kind, setKind] = useState<UnlockKind>(null);
   const [unlock, setUnlock] = useState(isUnlockEnabled());
   const [deleting, setDeleting] = useState(false);
 
@@ -64,10 +66,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             setDeleting(true);
             // Photos first (storage files can only be removed through the Storage API).
-            if (userId) {
-              const { data: files } = await supabase.storage.from('avatars').list(userId);
-              if (files?.length) await supabase.storage.from('avatars').remove(files.map((f) => `${userId}/${f.name}`));
-            }
+            if (userId) await removePhotos(userId);
             const { error } = await supabase.rpc('delete_my_account');
             setDeleting(false);
             if (error) {

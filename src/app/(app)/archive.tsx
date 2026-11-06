@@ -5,9 +5,8 @@ import { RoamCard } from '@/components/roam-card';
 import { Body, H1, Label, Loading, Screen, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useArchive, type FeedItem } from '@/lib/data';
+import { LONG_MONTHS } from '@/lib/format';
 import { colors, fonts } from '@/lib/theme';
-
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** Past and called-off Roams, grouped by month. */
 export default function Archive() {
@@ -19,7 +18,7 @@ export default function Archive() {
   const groups: { label: string; items: FeedItem[] }[] = [];
   for (const it of items) {
     const d = new Date(it.roam.starts_at);
-    const label = `${MONTHS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''}`;
+    const label = `${LONG_MONTHS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''}`;
     const last = groups.at(-1);
     if (last?.label === label) last.items.push(it);
     else groups.push({ label, items: [it] });

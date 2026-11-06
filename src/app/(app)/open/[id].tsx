@@ -5,6 +5,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View
 
 import { CheckIcon } from '@/components/icons';
 import { Avatar, Body, Button, H1, Label, Loading, Screen, Sticker, Tag, TopBar } from '@/components/ui';
+import { alertError } from '@/lib/alerts';
 import { useAuth } from '@/lib/auth';
 import {
   buzzerIn,
@@ -14,17 +15,14 @@ import {
   standings,
   useOpenRoam,
   useTick,
-  vibeName,
   type OpenRoam,
 } from '@/lib/open-roams';
-import { VIBES } from '@/lib/roams';
-import { busyLabel } from '@/lib/calendar';
+import { vibeLabel, VIBES } from '@/lib/roams';
+import { busyLabel, eventsOnNight, useCalendarBusy } from '@/lib/calendar';
+import { DAYS, HOUR, joinShort } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
-import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Vibe } from '@/lib/types';
-
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function OpenRoamScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -86,13 +84,8 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
 
   // What's already on your calendar on each night (if you've turned that on).
   const firstNight = o.nights[0] ? new Date(o.nights[0]) : null;
-  const lastNight = o.nights.at(-1) ? new Date(new Date(o.nights.at(-1)!).getTime() + 6 * 3600_000) : null;
-  const calBusy = useBusy(firstNight ? new Date(firstNight.getTime() - 2 * 3600_000) : null, lastNight);
-  const busyOn = (night: string) => {
-    const start = new Date(night).getTime() - 2 * 3600_000; // from 5pm
-    const end = new Date(night).getTime() + 5 * 3600_000;
-    return (calBusy ?? []).filter((e) => e.start.getTime() < end && e.end.getTime() > start);
-  };
+  const lastNight = o.nights.at(-1) ? new Date(new Date(o.nights.at(-1)!).getTime() + 6 * HOUR) : null;
+  const calBusy = useCalendarBusy(firstNight ? new Date(firstNight.getTime() - 2 * HOUR) : null, lastNight);
   const profileOf = (uid: string) => o.people.find((p) => p.user_id === uid)?.profile;
 
   function toggle<T>(set: Set<T>, setter: (s: Set<T>) => void, v: T) {
@@ -108,7 +101,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
     const { error } = await supabase.rpc('vote_open_roam', { p_open: o.id, p_nights: [...nights], p_vibes: [...vibes] });
     setSaving(false);
     if (error) {
-      Alert.alert('Hmm', openRoamError(error));
+      alertError(error, openRoamError);
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -124,7 +117,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
     setBusyIdea(ideaId);
     const { error } = await supabase.rpc('toggle_open_roam_idea_vote', { p_idea: ideaId });
     setBusyIdea(null);
-    if (error) Alert.alert('Hmm', openRoamError(error));
+    if (error) alertError(error, openRoamError);
     else Haptics.selectionAsync().catch(() => {});
     reload();
   }
@@ -134,7 +127,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
     if (!text) return;
     const { error } = await supabase.rpc('pitch_open_roam_idea', { p_open: o.id, p_text: text });
     if (error) {
-      Alert.alert('Hmm', openRoamError(error));
+      alertError(error, openRoamError);
       return;
     }
     setPitch('');
@@ -175,6 +168,7 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
             const free = s.freeBy.get(n) ?? [];
             const names = free.map((uid) => (uid === me ? 'You' : profileOf(uid)?.display_name ?? '?'));
             const d = new Date(n);
+            const plans = eventsOnNight(calBusy, n);
             return (
               <Pressable
                 key={n}
@@ -192,12 +186,12 @@ function Vote({ o, me, now, reload }: { o: OpenRoam; me: string; now: number; re
                     <View style={{ height: '100%', width: `${Math.round((free.length / maxFree) * 100)}%`, backgroundColor: n === s.leadNight ? colors.lime : colors.lilac }} />
                   </View>
                   <Text numberOfLines={1} style={{ fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.inkSoft }}>
-                    {free.length} free{names.length ? ` · ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` +${names.length - 3}` : ''}` : ''}
+                    {free.length} free{names.length ? ` · ${joinShort(names)}` : ''}
                   </Text>
-                  {busyOn(n).length ? (
+                  {plans.length ? (
                     <Text numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: colors.violet }}>
-                      📅 You've got {busyLabel(busyOn(n)[0])}
-                      {busyOn(n).length > 1 ? ` +${busyOn(n).length - 1}` : ''}
+                      📅 You've got {busyLabel(plans[0])}
+                      {plans.length > 1 ? ` +${plans.length - 1}` : ''}
                     </Text>
                   ) : null}
                 </View>
@@ -306,7 +300,7 @@ function Result({ o, me }: { o: OpenRoam; me: string }) {
   const night = o.winning_night!;
   const free = new Set(o.nightVotes.filter((v) => new Date(v.night_start).getTime() === new Date(night).getTime()).map((v) => v.user_id));
   free.add(o.host_id);
-  const vibe = vibeName(o.winning_vibe);
+  const vibe = vibeLabel(o.winning_vibe);
 
   return (
     <Screen

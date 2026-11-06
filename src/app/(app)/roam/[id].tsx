@@ -6,21 +6,29 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, Tex
 import { AddPersonIcon, ClashIcon, MoreIcon, PinIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
 import { Avatar, Body, Button, Checkbox, Chip, H1, Label, Loading, Screen, Sheet, Sticker, Tag, TopBar } from '@/components/ui';
+import { alertError } from '@/lib/alerts';
 import { useAuth } from '@/lib/auth';
 import { findClashes, useFriends, useRoam } from '@/lib/data';
 import {
   effectiveResponse,
   formatWhen,
-  friendlyError,
   isActive,
   roamState,
   startsIn,
   STATE_LABEL,
   vibeLabel,
 } from '@/lib/roams';
-import { busyLabel, calendarAvailable, calendarPrefs, defaultCalendarId, requestCalendarAccess, setCalendarPrefs, syncCalendar } from '@/lib/calendar';
+import {
+  busyLabel,
+  calendarAvailable,
+  calendarPrefs,
+  defaultCalendarId,
+  requestCalendarAccess,
+  setCalendarPrefs,
+  syncCalendar,
+  useCalendarBusy,
+} from '@/lib/calendar';
 import { supabase } from '@/lib/supabase';
-import { useBusy } from '@/lib/use-busy';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Response, Roam } from '@/lib/types';
 
@@ -48,7 +56,7 @@ export default function RoamScreen() {
   const [bringOpen, setBringOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
 
-  const calBusy = useBusy(
+  const calBusy = useCalendarBusy(
     data.roam ? new Date(data.roam.starts_at) : null,
     data.roam ? new Date(data.roam.ends_at) : null,
   );
@@ -84,7 +92,7 @@ export default function RoamScreen() {
     const { error } = await fn();
     setBusy(null);
     if (error) {
-      Alert.alert('Hmm', friendlyError(error));
+      alertError(error);
       return false;
     }
     success?.();
@@ -155,7 +163,7 @@ export default function RoamScreen() {
     const { data: status, error } = await supabase.rpc('host_cant_make_it', { p_roam: roam!.id, p_note: bailNote || null });
     setBusy(null);
     if (error) {
-      Alert.alert('Hmm', friendlyError(error));
+      alertError(error);
       return;
     }
     Alert.alert(

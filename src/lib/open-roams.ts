@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 
 import { useAuth } from './auth';
 import { PROFILE, useLoader } from './data';
-import { VIBES } from './roams';
+import { DAY, DAYS, HOUR, LONG_DAYS, MINUTE, MONTHS, splitMinutes } from './format';
+import { matchError } from './roams';
+import { readJSON, writeJSON } from './storage';
 import { supabase } from './supabase';
 import type { Profile, Vibe } from './types';
 
@@ -66,7 +68,7 @@ export function useOpenRoams() {
   return useLoader<OpenRoam[]>(
     async () => {
       if (!userId) return [];
-      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const since = new Date(Date.now() - DAY).toISOString();
       const { data, error } = await supabase
         .from('open_roam_invites')
         .select('open_roam_id, open:open_roams!inner(status, buzzer_at)')
@@ -117,7 +119,7 @@ export function standings(o: OpenRoam): Standings {
   // Like the buzzer, skip nights that are already over (started more than 5 hours ago).
   const now = Date.now();
   const leadNight =
-    [...o.nights].filter((n) => new Date(n).getTime() + 5 * 3600_000 > now).sort(
+    [...o.nights].filter((n) => new Date(n).getTime() + 5 * HOUR > now).sort(
       (a, b) =>
         (freeBy.get(b)?.length ?? 0) - (freeBy.get(a)?.length ?? 0) || enthusiasm(b) - enthusiasm(a) || a.localeCompare(b),
     )[0] ?? null;
@@ -138,10 +140,6 @@ export function standings(o: OpenRoam): Standings {
 
 // ─── Formatting ─────────────────────────────────────────────────
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const LONG_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export function nightShort(iso: string) {
   const d = new Date(iso);
   return `${DAYS[d.getDay()]} ${d.getDate()}`;
@@ -153,19 +151,15 @@ export function nightLong(iso: string) {
 export function nightDayName(iso: string) {
   return LONG_DAYS[new Date(iso).getDay()];
 }
-export function vibeName(v: Vibe | null) {
-  return VIBES.find((x) => x.id === v)?.label ?? null;
-}
 
 export function buzzerIn(iso: string, now = Date.now()) {
   const ms = new Date(iso).getTime() - now;
   if (ms <= 0) return 'Buzzing now';
-  const mins = Math.ceil(ms / 60_000);
+  const mins = Math.ceil(ms / MINUTE);
   if (mins < 60) return `Buzzer in ${mins}m`;
-  const h = Math.floor(mins / 60);
-  if (h < 24) return `Buzzer in ${h}h ${mins % 60}m`;
-  const d = Math.floor(h / 24);
-  return `Buzzer in ${d}d ${h % 24}h`;
+  const { h, m, d, hOfDay } = splitMinutes(mins);
+  if (h < 24) return `Buzzer in ${h}h ${m}m`;
+  return `Buzzer in ${d}d ${hOfDay}h`;
 }
 
 /** Re-renders every `ms` so countdowns stay fresh. */
@@ -176,12 +170,6 @@ export function useTick(ms = 30_000) {
     return () => clearInterval(t);
   }, [ms]);
   return now;
-}
-
-/** "Jo, Priya +2" */
-export function namesShort(people: (Profile | null | undefined)[], me?: string | null, max = 3) {
-  const names = people.map((p) => (p?.id === me ? 'You' : p?.display_name ?? '?'));
-  return names.slice(0, max).join(', ') + (names.length > max ? ` +${names.length - max}` : '');
 }
 
 // ─── The buzzer ─────────────────────────────────────────────────
@@ -200,20 +188,13 @@ export async function resolveDue(openRoams: OpenRoam[], now = Date.now()) {
 // Which buzzer results you've already seen (kept on this phone).
 const SEEN_KEY = 'roami.buzzerSeen';
 export function seenBuzzers(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]') as string[]);
-  } catch {
-    return new Set();
-  }
+  const ids = readJSON<unknown>(SEEN_KEY, []);
+  return new Set(Array.isArray(ids) ? (ids as string[]) : []);
 }
 export function markBuzzerSeen(id: string) {
-  try {
-    const s = seenBuzzers();
-    s.add(id);
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...s].slice(-100)));
-  } catch {
-    // best effort
-  }
+  const s = seenBuzzers();
+  s.add(id);
+  writeJSON(SEEN_KEY, [...s].slice(-100));
 }
 
 /** Friendly errors from the open Roam functions. */
@@ -231,7 +212,5 @@ const ERRORS: Record<string, string> = {
   load_test_friends_first: 'Load test friends first.',
 };
 export function openRoamError(e: unknown) {
-  const msg = (e as { message?: string })?.message ?? String(e);
-  const key = Object.keys(ERRORS).find((k) => msg.includes(k));
-  return key ? ERRORS[key] : 'Something went sideways. Try again?';
+  return matchError(ERRORS, e);
 }
