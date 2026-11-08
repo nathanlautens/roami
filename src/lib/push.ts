@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
+import { readString, writeString } from './storage';
 import { supabase } from './supabase';
 
 /**
@@ -74,8 +75,8 @@ export function listenForPushTaps(open: (url: string) => void): () => void {
       if (!response) return;
       // Each tap opens its screen once, even if the app restarts or this listener is set up again.
       const id = response.notification.request.identifier;
-      if (id && readHandled() === id) return;
-      writeHandled(id);
+      if (id && readString(HANDLED_KEY) === id) return;
+      writeString(HANDLED_KEY, id);
       const url = response.notification.request.content.data?.url;
       // Only Roami's own screens: a path like /roam/<id>, never another site.
       if (typeof url === 'string' && /^\/(?!\/)[A-Za-z0-9/_-]*$/.test(url)) open(url);
@@ -94,17 +95,3 @@ export function listenForPushTaps(open: (url: string) => void): () => void {
 }
 
 const HANDLED_KEY = 'roami.lastPushTap';
-function readHandled() {
-  try {
-    return localStorage.getItem(HANDLED_KEY);
-  } catch {
-    return null;
-  }
-}
-function writeHandled(id: string) {
-  try {
-    localStorage.setItem(HANDLED_KEY, id);
-  } catch {
-    // best effort
-  }
-}

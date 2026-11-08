@@ -1,7 +1,12 @@
 import { isRunningInExpoGo } from 'expo';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { clock, HOUR } from './format';
+import { isActive } from './roams';
+import { readJSON, writeJSON } from './storage';
 import { supabase } from './supabase';
+import type { Roam } from './types';
 
 /**
  * Calendar sync with the calendars on this phone: Apple Calendar on iPhone
@@ -35,22 +40,6 @@ type Link = { eventId: string; starts: string; ends: string; what: string; locat
 
 const PREFS_KEY = 'roami.calendar.prefs';
 const LINKS_KEY = 'roami.calendar.links';
-
-function readJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function writeJSON(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // best effort
-  }
-}
 
 export function calendarPrefs(): Prefs {
   return readJSON<Prefs>(PREFS_KEY, { sync: false, calendarId: null, showPlans: false, asked: false });
@@ -121,7 +110,7 @@ type InviteRow = {
     location: string | null;
     starts_at: string;
     ends_at: string;
-    status: string;
+    status: Roam['status'];
     host: { display_name: string | null } | null;
   } | null;
 };
@@ -193,8 +182,7 @@ async function doSync(userId: string) {
   }
 
   // The host is always In, until they say they can't make it (then their answer is Can't).
-  const shouldBeIn = (r: InviteRow) =>
-    !!r.roam && r.roam.status !== 'cancelled' && new Date(r.roam.ends_at) > new Date() && r.response === 'in';
+  const shouldBeIn = (r: InviteRow) => !!r.roam && isActive(r.roam) && r.response === 'in';
 
   // Add or update
   for (const r of rows.values()) {
@@ -241,14 +229,7 @@ async function doSync(userId: string) {
       continue;
     }
     if (r && shouldBeIn(r)) continue;
-    if (link.eventId) {
-      try {
-        const event = await C.ExpoCalendarEvent.get(link.eventId);
-        await event.delete();
-      } catch {
-        // already gone
-      }
-    }
+    await deleteEvent(C, link.eventId);
     delete linked[roamId];
   }
 
@@ -259,17 +240,19 @@ async function doSync(userId: string) {
 export async function removeAllRoamiEvents() {
   if (!calendarAvailable) return;
   const C = await cal();
-  const l = links();
-  for (const link of Object.values(l)) {
-    if (!link.eventId) continue;
-    try {
-      const event = await C.ExpoCalendarEvent.get(link.eventId);
-      await event.delete();
-    } catch {
-      // already gone
-    }
-  }
+  for (const link of Object.values(links())) await deleteEvent(C, link.eventId);
   saveLinks({});
+}
+
+/** Deletes one of Roami's events; quietly does nothing if it's already gone. */
+async function deleteEvent(C: CalendarModule, eventId: string) {
+  if (!eventId) return;
+  try {
+    const event = await C.ExpoCalendarEvent.get(eventId);
+    await event.delete();
+  } catch {
+    // already gone
+  }
 }
 
 // ─── c) What's already on your calendar ─────────────────────────
@@ -296,10 +279,32 @@ export async function busyBetween(start: Date, end: Date): Promise<BusyEvent[]> 
 
 export function busyLabel(e: BusyEvent) {
   if (e.allDay) return `${e.title} (all day)`;
-  const t = (d: Date) => {
-    const h = d.getHours() % 12 || 12;
-    const m = d.getMinutes();
-    return `${h}${m ? `:${String(m).padStart(2, '0')}` : ''}${d.getHours() >= 12 ? 'pm' : 'am'}`;
-  };
-  return `${e.title}, ${t(e.start)}–${t(e.end)}`;
+  return `${e.title}, ${clock(e.start)}–${clock(e.end)}`;
+}
+
+/** Events overlapping a Roam night (5pm to midnight, around its 7pm start). */
+export function eventsOnNight(events: BusyEvent[] | null, nightIso: string) {
+  const start = new Date(nightIso).getTime() - 2 * HOUR;
+  const end = new Date(nightIso).getTime() + 5 * HOUR;
+  return (events ?? []).filter((e) => e.start.getTime() < end && e.end.getTime() > start);
+}
+
+/** Your calendar events in a time range (empty if calendar checks are off; null while loading). */
+export function useCalendarBusy(start: Date | null, end: Date | null) {
+  const [events, setEvents] = useState<BusyEvent[] | null>(null);
+  const s = start?.getTime() ?? null;
+  const e = end?.getTime() ?? null;
+
+  useEffect(() => {
+    if (s === null || e === null) return;
+    let cancelled = false;
+    busyBetween(new Date(s), new Date(e)).then((ev) => {
+      if (!cancelled) setEvents(ev);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [s, e]);
+
+  return events;
 }

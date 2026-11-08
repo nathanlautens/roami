@@ -1,15 +1,19 @@
-import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
+  type AccessibilityRole,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
@@ -17,6 +21,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { haptic } from '@/lib/haptics';
+import { displayName } from '@/lib/format';
 import { avatarColors, border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
 import { BackIcon, CheckIcon, CloseIcon } from './icons';
@@ -27,14 +33,17 @@ export function Screen({
   children,
   footer,
   scroll = true,
+  keyboard,
   style,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   scroll?: boolean;
+  /** Lifts the footer above the keyboard (iOS), for screens with text inputs. */
+  keyboard?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  return (
+  const screen = (
     <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
       {scroll ? (
         <ScrollView
@@ -48,6 +57,12 @@ export function Screen({
       )}
       {footer ? <View style={s.footer}>{footer}</View> : null}
     </SafeAreaView>
+  );
+  if (!keyboard) return screen;
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {screen}
+    </KeyboardAvoidingView>
   );
 }
 
@@ -103,8 +118,40 @@ export function H1({ children, style }: { children: ReactNode; style?: StyleProp
 export function Body({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[s.body, style]}>{children}</Text>;
 }
-export function Label({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
-  return <Text style={[s.label, style]}>{children}</Text>;
+/** Small caps heading. `count` adds " · 3"; `dot` adds a coloured dot in front. */
+export function Label({
+  children,
+  style,
+  count,
+  dot,
+}: {
+  children: ReactNode;
+  style?: StyleProp<TextStyle>;
+  count?: number;
+  dot?: string;
+}) {
+  const text = (
+    <Text style={[s.label, style]}>
+      {children}
+      {count !== undefined ? ` · ${count}` : null}
+    </Text>
+  );
+  if (!dot) return text;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <View style={[s.dot, { backgroundColor: dot }]} />
+      {text}
+    </View>
+  );
+}
+
+/** The "roami." logo. */
+export function Wordmark({ style }: { style?: StyleProp<TextStyle> }) {
+  return (
+    <Text style={[s.wordmark, style]}>
+      roami<Text style={{ color: colors.pink }}>.</Text>
+    </Text>
+  );
 }
 
 // ─── Sticker: a card with a hard offset shadow ──────────────────
@@ -179,7 +226,7 @@ export function Button({
   const inactive = disabled || loading;
   const press = () => {
     if (inactive) return;
-    if (variant === 'primary') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (variant === 'primary') haptic.press();
     onPress();
   };
 
@@ -248,7 +295,7 @@ export function Chip({
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
       onPress={() => {
-        Haptics.selectionAsync().catch(() => {});
+        haptic.select();
         onPress();
       }}
       style={[s.chip, { backgroundColor: selected ? selectedColor : colors.white }]}>
@@ -262,6 +309,55 @@ export function Tag({ label, dark, color }: { label: string; dark?: boolean; col
     <View style={[s.tag, { backgroundColor: color ?? (dark ? colors.ink : colors.white) }]}>
       <Text style={[s.tagText, dark && { color: color ? colors.ink : colors.white }]}>{label}</Text>
     </View>
+  );
+}
+
+/**
+ * A bordered option you tap to pick (radio or checkbox). Fills with
+ * `selectedColor` when selected. Layout goes in `style`.
+ */
+export function SelectTile({
+  selected,
+  onPress,
+  children,
+  role = 'radio',
+  selectedColor = colors.lime,
+  color = colors.white,
+  rounded = radius.md,
+  haptic: withHaptic,
+  disabled,
+  accessibilityLabel,
+  style,
+}: {
+  selected: boolean;
+  onPress: () => void;
+  children: ReactNode;
+  role?: 'radio' | 'checkbox' | 'button';
+  selectedColor?: string;
+  color?: string;
+  rounded?: number;
+  haptic?: boolean;
+  disabled?: boolean;
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const state = role === 'checkbox' ? { checked: selected, disabled } : role === 'radio' ? { selected, disabled } : { disabled };
+  return (
+    <Pressable
+      accessibilityRole={role as AccessibilityRole}
+      accessibilityState={state}
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
+      onPress={() => {
+        if (withHaptic) haptic.select();
+        onPress();
+      }}
+      style={[
+        { borderWidth: border, borderColor: colors.ink, borderRadius: rounded, backgroundColor: selected ? selectedColor : color },
+        style,
+      ]}>
+      {children}
+    </Pressable>
   );
 }
 
@@ -284,18 +380,75 @@ export function Checkbox({ checked, round }: { checked: boolean; round?: boolean
   );
 }
 
+/** A title and a line of explanation with an on/off switch. */
+export function SwitchRow({
+  title,
+  sub,
+  value,
+  onChange,
+  large,
+}: {
+  title: string;
+  sub: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  large?: boolean;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontFamily: fonts.bodyBold, fontSize: large ? 16 : 15, color: colors.ink }}>{title}</Text>
+        <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>{sub}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: colors.ink, false: colors.mute }}
+        thumbColor={colors.lime}
+        accessibilityLabel={title}
+      />
+    </View>
+  );
+}
+
+/** A thin bordered bar filled to `value` (0–1). */
+export function ProgressBar({
+  value,
+  color = colors.ink,
+  track = colors.white,
+  height = 12,
+  borderWidth = 2,
+}: {
+  value: number;
+  color?: string;
+  track?: string;
+  height?: number;
+  borderWidth?: number;
+}) {
+  return (
+    <View style={{ height, borderRadius: height / 2 + 1, backgroundColor: track, borderWidth, borderColor: colors.ink, overflow: 'hidden' }}>
+      <View style={{ height: '100%', width: `${Math.round(value * 100)}%`, backgroundColor: color }} />
+    </View>
+  );
+}
+
 // ─── Inputs ─────────────────────────────────────────────────────
 
 export function Field({ big, style, ...props }: TextInputProps & { big?: boolean }) {
   return (
     <Sticker shadow={colors.lime} offset={4} rounded={radius.md}>
       <TextInput
-        placeholderTextColor="#8B82A3"
+        placeholderTextColor={colors.placeholder}
         {...props}
         style={[s.field, big && s.fieldBig, style]}
       />
     </Sticker>
   );
+}
+
+/** A plain bordered text box (notes, reasons, ideas). */
+export function InlineInput({ style, ...props }: TextInputProps) {
+  return <TextInput placeholderTextColor={colors.placeholder} {...props} style={[s.inlineInput, style]} />;
 }
 
 // ─── People ─────────────────────────────────────────────────────
@@ -340,8 +493,62 @@ export function AvatarStack({ people, size = 30 }: { people: (Profile | null | u
   );
 }
 
+/** Avatar and name in a bordered row, with optional controls on the right. Tappable if `onPress` is set. */
+export function PersonRow({
+  profile,
+  children,
+  onPress,
+  role = 'button',
+  checked,
+  color = colors.white,
+  avatarSize = 40,
+  nameSize = 16,
+  faded,
+}: {
+  profile: Profile;
+  children?: ReactNode;
+  onPress?: () => void;
+  role?: 'button' | 'checkbox';
+  checked?: boolean;
+  color?: string;
+  avatarSize?: number;
+  nameSize?: number;
+  faded?: boolean;
+}) {
+  const content = (
+    <>
+      <Avatar profile={profile} size={avatarSize} faded={faded} />
+      <Text style={{ flex: 1, fontFamily: fonts.bodyBold, fontSize: nameSize, color: colors.ink }}>{profile.display_name}</Text>
+      {children}
+    </>
+  );
+  const style = [s.personRow, { backgroundColor: color }];
+  if (!onPress) return <View style={style}>{content}</View>;
+  return (
+    <Pressable
+      accessibilityRole={role}
+      accessibilityState={role === 'checkbox' ? { checked: !!checked } : undefined}
+      onPress={onPress}
+      style={style}>
+      {content}
+    </Pressable>
+  );
+}
+
+/** Avatar with a name underneath, for rows of people who are in. */
+export function PersonChip({ profile, label, compact }: { profile?: Profile | null; label?: string | null; compact?: boolean }) {
+  return (
+    <View style={{ alignItems: 'center', gap: compact ? 3 : 4, width: compact ? 46 : 56 }}>
+      <Avatar profile={profile} size={compact ? 40 : 48} />
+      <Text numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: compact ? 12 : 13, color: colors.ink }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 export function namesIn(people: (Profile | null | undefined)[], me?: string | null) {
-  const names = people.map((p) => (p?.id === me ? 'You' : p?.display_name ?? 'Someone'));
+  const names = people.map((p) => displayName(p, me, 'Someone'));
   if (names.length === 0) return 'Nobody yet';
   if (names.length === 1) return `${names[0]} is in`;
   if (names.length === 2) return `${names[0]} + ${names[1]} are in`;
@@ -359,6 +566,22 @@ export function Sheet({ visible, onClose, children }: { visible: boolean; onClos
         {children}
       </SafeAreaView>
     </Modal>
+  );
+}
+
+/** A screen for something that's gone or failed to load, with a retry when it failed. */
+export function MissingScreen({ title, error, onRetry }: { title: string; error?: string | null; onRetry: () => void }) {
+  return (
+    <Screen>
+      <TopBar onBack={() => router.back()} />
+      <H1 style={{ marginTop: 24 }}>{title}</H1>
+      {error ? (
+        <View style={{ gap: 12, marginTop: 12 }}>
+          <Body>{error}</Body>
+          <Button variant="dashed" label="Try again" onPress={onRetry} />
+        </View>
+      ) : null}
+    </Screen>
   );
 }
 
@@ -385,6 +608,28 @@ export const s = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 1,
     textTransform: 'uppercase',
+    color: colors.ink,
+  },
+  dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: colors.ink },
+  wordmark: { fontFamily: fonts.display, fontSize: 64, letterSpacing: -2.5, color: colors.ink },
+  personRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 10,
+    borderWidth: border,
+    borderColor: colors.ink,
+    borderRadius: radius.md,
+  },
+  inlineInput: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    borderWidth: border,
+    borderColor: colors.ink,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    fontFamily: fonts.body,
+    fontSize: 15,
     color: colors.ink,
   },
   primaryWrap: { height: 64, paddingRight: 4, paddingBottom: 4 },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, Switch, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import {
@@ -14,7 +14,9 @@ import {
   type PhoneCalendar,
 } from '@/lib/calendar';
 import { colors, fonts, radius } from '@/lib/theme';
-import { Sticker } from './ui';
+import { SelectTile, Sticker, SwitchRow } from './ui';
+
+const noAccess = () => Alert.alert('No calendar access', 'Allow Roami to use your calendar in Settings to turn this on.');
 
 /** Profile section: add Roams to my calendar, and show my plans when deciding. */
 export function CalendarSettings() {
@@ -44,10 +46,7 @@ export function CalendarSettings() {
 
   async function toggleSync(on: boolean) {
     if (on) {
-      if (!(await requestCalendarAccess())) {
-        Alert.alert('No calendar access', 'Allow Roami to use your calendar in Settings to turn this on.');
-        return;
-      }
+      if (!(await requestCalendarAccess())) return noAccess();
       update({ sync: true, calendarId: prefs.calendarId ?? (await defaultCalendarId()) });
       if (userId) syncCalendar(userId);
     } else {
@@ -66,10 +65,7 @@ export function CalendarSettings() {
   }
 
   async function toggleShowPlans(on: boolean) {
-    if (on && !(await requestCalendarAccess())) {
-      Alert.alert('No calendar access', 'Allow Roami to use your calendar in Settings to turn this on.');
-      return;
-    }
+    if (on && !(await requestCalendarAccess())) return noAccess();
     update({ showPlans: on });
   }
 
@@ -77,13 +73,13 @@ export function CalendarSettings() {
     <Sticker shadow={null} innerStyle={{ padding: 14, gap: 14 }}>
       <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>Calendar</Text>
 
-      <Row
+      <SwitchRow
         title="Add Roams to my calendar"
         sub="When you're in. Removed if you bail or it's called off."
         value={prefs.sync}
         onChange={toggleSync}
       />
-      <Row
+      <SwitchRow
         title="Show my plans when deciding"
         sub="See what's already on when you answer or vote."
         value={prefs.showPlans}
@@ -97,28 +93,18 @@ export function CalendarSettings() {
             {calendars.map((c) => {
               const on = prefs.calendarId === c.id;
               return (
-                <Pressable
+                <SelectTile
                   key={c.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: on }}
+                  selected={on}
+                  rounded={radius.pill}
                   accessibilityLabel={`${c.title}${c.account ? `, ${c.account}` : ''}`}
                   onPress={() => update({ calendarId: c.id })}
-                  style={{
-                    minHeight: 36,
-                    paddingHorizontal: 12,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    borderWidth: 2,
-                    borderColor: colors.ink,
-                    borderRadius: radius.pill,
-                    backgroundColor: on ? colors.lime : colors.white,
-                  }}>
+                  style={{ minHeight: 36, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 2 }}>
                   <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.color ?? colors.mute, borderWidth: 1, borderColor: colors.ink }} />
                   <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink }} numberOfLines={1}>
                     {c.title}
                   </Text>
-                </Pressable>
+                </SelectTile>
               );
             })}
           </View>
@@ -127,16 +113,3 @@ export function CalendarSettings() {
     </Sticker>
   );
 }
-
-function Row({ title, sub, value, onChange }: { title: string; sub: string; value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}>{title}</Text>
-        <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>{sub}</Text>
-      </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.ink, false: colors.mute }} thumbColor={colors.lime} accessibilityLabel={title} />
-    </View>
-  );
-}
-

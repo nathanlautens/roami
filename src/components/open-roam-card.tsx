@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
-import { buzzerIn, nightShort, standings, vibeName, type OpenRoam } from '@/lib/open-roams';
+import { joinShort } from '@/lib/format';
+import { buzzerIn, nightShort, standings, type OpenRoam } from '@/lib/open-roams';
+import { vibeLabel } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
-import { Avatar, Sticker, Tag } from './ui';
+import { Avatar, ProgressBar, Sticker, Tag } from './ui';
 
 /** A "Buzzing" card on home for an open Roam that's still being voted on. */
 export function OpenRoamCard({ o, me, now }: { o: OpenRoam; me: string; now: number }) {
@@ -11,7 +13,7 @@ export function OpenRoamCard({ o, me, now }: { o: OpenRoam; me: string; now: num
   const amHost = o.host_id === me;
   const iVoted = !!o.people.find((p) => p.user_id === me)?.voted_at;
   const total = o.people.length;
-  const leading = [s.leadNight ? nightShort(s.leadNight) : null, vibeName(s.leadVibe)].filter(Boolean).join(' · ');
+  const leading = [s.leadNight ? nightShort(s.leadNight) : null, vibeLabel(s.leadVibe)].filter(Boolean).join(' · ');
   const hot = !amHost && !iVoted;
 
   return (
@@ -35,17 +37,14 @@ export function OpenRoamCard({ o, me, now }: { o: OpenRoam; me: string; now: num
           </Text>
         ) : (
           <View style={{ gap: 6 }}>
-            <View style={{ height: 12, borderRadius: 7, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.ink, overflow: 'hidden' }}>
-              <View style={{ height: '100%', width: `${Math.round((s.votedCount / Math.max(total, 1)) * 100)}%`, backgroundColor: colors.ink }} />
-            </View>
+            <ProgressBar value={s.votedCount / Math.max(total, 1)} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
               <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink }}>
                 {s.votedCount} of {total} voted
               </Text>
               {s.waitingOn.length ? (
                 <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink }}>
-                  Waiting on {s.waitingOn.slice(0, 3).map((p) => p.display_name).join(', ')}
-                  {s.waitingOn.length > 3 ? ` +${s.waitingOn.length - 3}` : ''}
+                  Waiting on {joinShort(s.waitingOn.map((p) => p.display_name ?? '?'))}
                 </Text>
               ) : null}
             </View>

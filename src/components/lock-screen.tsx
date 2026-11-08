@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { authenticate, clearUnlockPrefs, unlockKind, unlockLabel } from '@/lib/biometric';
 import { useAuth } from '@/lib/auth';
 import { colors, fonts } from '@/lib/theme';
-import { Body, Button, Sticker } from './ui';
+import { Body, Button, Sticker, Wordmark } from './ui';
 
 /** Shown over the app until you pass Face ID / fingerprint / passcode. */
 export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
@@ -51,9 +51,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ground }}>
       <View style={{ flex: 1, paddingHorizontal: 24, justifyContent: 'center', gap: 28 }}>
-        <Text style={{ fontFamily: fonts.display, fontSize: 64, letterSpacing: -2.5, color: colors.ink, textAlign: 'center' }}>
-          roami<Text style={{ color: colors.pink }}>.</Text>
-        </Text>
+        <Wordmark style={{ textAlign: 'center' }} />
         <Sticker color={colors.lime} rotate={-2} innerStyle={{ padding: 20, gap: 6, alignItems: 'center' }}>
           <Text style={{ fontFamily: fonts.display, fontSize: 26, color: colors.ink }}>It's you, right?</Text>
           <Body style={{ textAlign: 'center', color: colors.ink }}>Quick {label} and you're in.</Body>

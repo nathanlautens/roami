@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Switch, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { BlockedList } from '@/components/blocked-list';
 import { CalendarSettings } from '@/components/calendar-settings';
 import { ProfileForm } from '@/components/profile-form';
-import { Body, Button, H1, Label, Screen, Sticker, TopBar } from '@/components/ui';
+import { Body, Button, H1, Label, Screen, Sticker, SwitchRow, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { removePhotos } from '@/lib/avatar';
 import {
   authenticate,
   clearUnlockPrefs,
@@ -14,17 +15,19 @@ import {
   setUnlockEnabled,
   unlockKind,
   unlockLabel,
+  type UnlockKind,
 } from '@/lib/biometric';
 import { removeAllRoamiEvents, setCalendarPrefs } from '@/lib/calendar';
 import { SKIP_LOGIN } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
+import { useAction } from '@/lib/use-action';
 import { colors, fonts } from '@/lib/theme';
 
 export default function ProfileScreen() {
   const { signOut, session, userId } = useAuth();
-  const [kind, setKind] = useState<Awaited<ReturnType<typeof unlockKind>>>(null);
+  const [kind, setKind] = useState<UnlockKind>(null);
   const [unlock, setUnlock] = useState(isUnlockEnabled());
-  const [deleting, setDeleting] = useState(false);
+  const [deleting, run] = useAction();
 
   useEffect(() => {
     unlockKind().then(setKind);
@@ -62,14 +65,11 @@ export default function ProfileScreen() {
           text: 'Delete forever',
           style: 'destructive',
           onPress: async () => {
-            setDeleting(true);
-            // Photos first (storage files can only be removed through the Storage API).
-            if (userId) {
-              const { data: files } = await supabase.storage.from('avatars').list(userId);
-              if (files?.length) await supabase.storage.from('avatars').remove(files.map((f) => `${userId}/${f.name}`));
-            }
-            const { error } = await supabase.rpc('delete_my_account');
-            setDeleting(false);
+            const { error } = await run('delete', async () => {
+              // Photos first (storage files can only be removed through the Storage API).
+              if (userId) await removePhotos(userId);
+              return supabase.rpc('delete_my_account');
+            });
             if (error) {
               Alert.alert("Couldn't delete your account", 'Try again, or email admin@roami.com and we\'ll do it for you.');
               return;
@@ -102,18 +102,8 @@ export default function ProfileScreen() {
           ) : null}
 
           {kind ? (
-            <Sticker shadow={null} innerStyle={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>Unlock with {label}</Text>
-                <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft }}>Asked when you open Roami</Text>
-              </View>
-              <Switch
-                value={unlock}
-                onValueChange={toggleUnlock}
-                trackColor={{ true: colors.ink, false: colors.mute }}
-                thumbColor={colors.lime}
-                accessibilityLabel={`Unlock with ${label}`}
-              />
+            <Sticker shadow={null} innerStyle={{ padding: 14 }}>
+              <SwitchRow large title={`Unlock with ${label}`} sub="Asked when you open Roami" value={unlock} onChange={toggleUnlock} />
             </Sticker>
           ) : null}
 

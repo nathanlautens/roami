@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
+import { friendlyError } from '@/lib/roams';
 import { supabase } from '@/lib/supabase';
-import { border, colors, fonts, radius } from '@/lib/theme';
+import { colors, fonts, radius } from '@/lib/theme';
+import { useAction } from '@/lib/use-action';
 import type { Profile } from '@/lib/types';
-import { Body, Button, Sheet } from './ui';
+import { Body, Button, InlineInput, SelectTile, Sheet } from './ui';
 
 const REASONS: { id: string; label: string }[] = [
   { id: 'harassment', label: 'Being mean or harassing' },
@@ -34,7 +36,7 @@ export function SafetySheet({
   const [step, setStep] = useState<'menu' | 'report'>('menu');
   const [reason, setReason] = useState<string | null>(null);
   const [details, setDetails] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, run] = useAction();
   const name = person?.display_name ?? 'them';
 
   function close() {
@@ -46,16 +48,16 @@ export function SafetySheet({
 
   async function sendReport() {
     if (!reason) return;
-    setBusy(true);
-    const { error } = await supabase.rpc('report', {
-      p_user: person?.id ?? null,
-      p_roam: roamId ?? null,
-      p_reason: reason,
-      p_details: details.trim() || null,
-    });
-    setBusy(false);
+    const { error } = await run('report', () =>
+      supabase.rpc('report', {
+        p_user: person?.id ?? null,
+        p_roam: roamId ?? null,
+        p_reason: reason,
+        p_details: details.trim() || null,
+      }),
+    );
     if (error) {
-      Alert.alert("Couldn't send that", error.message.includes('too_many') ? 'Slow down a sec and try again later.' : 'Try again?');
+      Alert.alert("Couldn't send that", error.message.includes('too_many_reports') ? friendlyError(error) : 'Try again?');
       return;
     }
     close();
@@ -107,35 +109,21 @@ export function SafetySheet({
           {REASONS.map((r) => {
             const on = reason === r.id;
             return (
-              <Pressable
-                key={r.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
-                onPress={() => setReason(r.id)}
-                style={{
-                  minHeight: 48,
-                  paddingHorizontal: 14,
-                  justifyContent: 'center',
-                  borderWidth: border,
-                  borderColor: colors.ink,
-                  borderRadius: radius.md,
-                  backgroundColor: on ? colors.lime : colors.white,
-                }}>
+              <SelectTile key={r.id} selected={on} onPress={() => setReason(r.id)} style={{ minHeight: 48, paddingHorizontal: 14, justifyContent: 'center' }}>
                 <Text style={{ fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink }}>{r.label}</Text>
-              </Pressable>
+              </SelectTile>
             );
           })}
-          <TextInput
+          <InlineInput
             value={details}
             onChangeText={setDetails}
             placeholder="Anything else we should know? (optional)"
-            placeholderTextColor="#8B82A3"
             maxLength={500}
             multiline
             accessibilityLabel="More details"
-            style={{ minHeight: 72, padding: 12, borderWidth: border, borderColor: colors.ink, borderRadius: radius.md, backgroundColor: colors.white, fontFamily: fonts.body, fontSize: 15, color: colors.ink, textAlignVertical: 'top' }}
+            style={{ minHeight: 72, padding: 12, paddingHorizontal: 12, borderRadius: radius.md, textAlignVertical: 'top' }}
           />
-          <Button label="Send report" onPress={sendReport} loading={busy} disabled={!reason} />
+          <Button label="Send report" onPress={sendReport} loading={!!busy} disabled={!reason} />
           <Button variant="link" label="Back" onPress={() => setStep('menu')} />
         </View>
       )}

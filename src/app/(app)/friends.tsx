@@ -5,11 +5,11 @@ import { Alert, Pressable, Share, Text, TextInput, View } from 'react-native';
 import { MoreIcon, ShareIcon } from '@/components/icons';
 import { SafetySheet } from '@/components/safety-sheet';
 import { TestTools } from '@/components/test-tools';
-import { Avatar, Body, Button, H1, Label, Screen, Sticker, Tag, TopBar } from '@/components/ui';
+import { Body, Button, H1, Label, PersonRow, Screen, Sticker, Tag, TopBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { useFriends } from '@/lib/data';
-import { friendlyError } from '@/lib/roams';
+import { addFriend, useFriends } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
+import { useAction } from '@/lib/use-action';
 import { border, colors, fonts, radius } from '@/lib/theme';
 import type { Profile } from '@/lib/types';
 
@@ -17,15 +17,11 @@ export default function Friends() {
   const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
   const { userId } = useAuth();
   const { data, reload } = useFriends();
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyId, runAdd] = useAction();
   const [safetyFor, setSafetyFor] = useState<Profile | null>(null);
 
-
   async function add(id: string) {
-    setBusyId(id);
-    const { error } = await supabase.rpc('add_friend', { p_target: id });
-    setBusyId(null);
-    if (error) Alert.alert('Hmm', friendlyError(error));
+    await runAdd(id, () => addFriend(id));
     reload();
   }
 
@@ -43,7 +39,7 @@ export default function Friends() {
   // Friend codes: the first 8 characters of someone's id, e.g. "3F9A12BC".
   const myCode = userId ? userId.slice(0, 8).toUpperCase() : '';
   const [code, setCode] = useState('');
-  const [adding, setAdding] = useState(false);
+  const [adding, runCode] = useAction();
 
   async function addByCode() {
     const clean = code.trim().toLowerCase().replace(/[^0-9a-f]/g, '');
@@ -55,25 +51,24 @@ export default function Friends() {
       Alert.alert("That's you, babe", 'Ask your friend for their code.');
       return;
     }
-    setAdding(true);
-    // Looked up on the server, one person at a time (profiles aren't listable).
-    const { data } = await supabase.rpc('find_by_friend_code', { p_code: clean });
-    const found = (data ?? []) as { id: string; display_name: string }[];
-    if (found.length !== 1) {
-      setAdding(false);
+    const result = await runCode('add', async () => {
+      // Looked up on the server, one person at a time (profiles aren't listable).
+      const { data } = await supabase.rpc('find_by_friend_code', { p_code: clean });
+      const found = (data ?? []) as { id: string; display_name: string }[];
+      if (found.length !== 1) return 'not_found' as const;
+      const status = await addFriend(found[0].id);
+      return status ? { status, name: found[0].display_name } : null;
+    });
+    if (result === 'not_found') {
       Alert.alert('No one by that code', 'Double-check it with your friend?');
       return;
     }
-    const { data: status, error } = await supabase.rpc('add_friend', { p_target: found[0].id });
-    setAdding(false);
-    if (error) {
-      Alert.alert('Hmm', friendlyError(error));
-      return;
-    }
+    if (!result) return;
+    const { status, name } = result;
     setCode('');
     Alert.alert(
-      status === 'accepted' ? `You and ${found[0].display_name} are friends!` : 'Request sent',
-      status === 'accepted' ? 'Go send them a Roam.' : `Once ${found[0].display_name} adds you back, you can roam together.`,
+      status === 'accepted' ? `You and ${name} are friends!` : 'Request sent',
+      status === 'accepted' ? 'Go send them a Roam.' : `Once ${name} adds you back, you can roam together.`,
     );
     reload();
   }
@@ -108,7 +103,7 @@ export default function Friends() {
             value={code}
             onChangeText={setCode}
             placeholder="Their code"
-            placeholderTextColor="#5E5670"
+            placeholderTextColor={colors.placeholderOnLime}
             autoCapitalize="characters"
             autoCorrect={false}
             maxLength={9}
@@ -117,7 +112,7 @@ export default function Friends() {
             onSubmitEditing={addByCode}
             style={{ flex: 1, minHeight: 48, paddingHorizontal: 14, borderWidth: border, borderColor: colors.ink, borderRadius: radius.sm, backgroundColor: colors.white, fontFamily: fonts.bodyBold, fontSize: 17, letterSpacing: 1.5, color: colors.ink }}
           />
-          <Pressable accessibilityRole="button" onPress={addByCode} disabled={adding} style={{ minHeight: 48, paddingHorizontal: 18, borderRadius: radius.sm, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', opacity: adding ? 0.6 : 1 }}>
+          <Pressable accessibilityRole="button" onPress={addByCode} disabled={!!adding} style={{ minHeight: 48, paddingHorizontal: 18, borderRadius: radius.sm, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', opacity: adding ? 0.6 : 1 }}>
             <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: colors.lime }}>{adding ? '…' : 'Add'}</Text>
           </Pressable>
         </View>
@@ -125,13 +120,13 @@ export default function Friends() {
 
       {data.incoming.length ? (
         <View style={{ marginBottom: 24 }}>
-          <Label>Want to roam with you · {data.incoming.length}</Label>
+          <Label count={data.incoming.length}>Want to roam with you</Label>
           <View style={{ gap: 8, marginTop: 10 }}>
             {data.incoming.map(({ id, profile }) => (
-              <Row key={id} profile={profile}>
+              <PersonRow key={id} profile={profile}>
                 <SmallButton label="Nah" onPress={() => decline(id)} />
                 <SmallButton label="Add" primary busy={busyId === profile.id} onPress={() => add(profile.id)} />
-              </Row>
+              </PersonRow>
             ))}
           </View>
         </View>
@@ -141,10 +136,10 @@ export default function Friends() {
 
       {data.friends.length ? (
         <View style={{ marginTop: 28 }}>
-          <Label>Your friends · {data.friends.length}</Label>
+          <Label count={data.friends.length}>Your friends</Label>
           <View style={{ gap: 8, marginTop: 10 }}>
             {data.friends.map((p) => (
-              <Row key={p.id} profile={p}>
+              <PersonRow key={p.id} profile={p}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`More options for ${p.display_name}`}
@@ -153,7 +148,7 @@ export default function Friends() {
                   style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
                   <MoreIcon size={20} />
                 </Pressable>
-              </Row>
+              </PersonRow>
             ))}
           </View>
         </View>
@@ -164,25 +159,15 @@ export default function Friends() {
           <Label>Waiting on them</Label>
           <View style={{ gap: 8, marginTop: 10 }}>
             {data.outgoing.map((p) => (
-              <Row key={p.id} profile={p}>
+              <PersonRow key={p.id} profile={p}>
                 <Tag label="Requested" />
-              </Row>
+              </PersonRow>
             ))}
           </View>
         </View>
       ) : null}
       <SafetySheet visible={!!safetyFor} person={safetyFor} onClose={() => setSafetyFor(null)} onBlocked={reload} />
     </Screen>
-  );
-}
-
-function Row({ profile, children }: { profile: Profile; children?: React.ReactNode }) {
-  return (
-    <Sticker shadow={null} rounded={radius.md} innerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 }}>
-      <Avatar profile={profile} size={40} />
-      <Text style={{ flex: 1, fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{profile.display_name}</Text>
-      {children}
-    </Sticker>
   );
 }
 

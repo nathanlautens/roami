@@ -1,22 +1,20 @@
-import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
-import { colors, fonts } from '@/lib/theme';
-import { Button, Sticker } from './ui';
+import { colors } from '@/lib/theme';
+import { useAction } from '@/lib/use-action';
+import { Button, Label, Sticker } from './ui';
 
 /**
  * Test-only shortcuts. Only shown in development (e.g. Expo Go), never in a
  * real build. Needs supabase/migrations/20261014230000_mock_friends.sql.
  */
 export function TestTools({ onChange }: { onChange?: () => void }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, run] = useAction();
   if (!__DEV__) return null;
 
   async function load() {
-    setBusy(true);
-    const { data, error } = await supabase.rpc('seed_mock_friends');
-    setBusy(false);
+    const { data, error } = await run('load', () => supabase.rpc('seed_mock_friends'));
     if (error) {
       Alert.alert(
         "Couldn't load test friends",
@@ -36,9 +34,7 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
   }
 
   async function testVote() {
-    setBusy(true);
-    const { error } = await supabase.rpc('seed_mock_open_roam');
-    setBusy(false);
+    const { error } = await run('vote', () => supabase.rpc('seed_mock_open_roam'));
     if (error) {
       Alert.alert(
         "Couldn't start a test vote",
@@ -64,9 +60,7 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          setBusy(true);
-          const { data, error } = await supabase.rpc('clear_mock_friends');
-          setBusy(false);
+          const { data, error } = await run('clear', () => supabase.rpc('clear_mock_friends'));
           if (error) Alert.alert('Hmm', error.message);
           else Alert.alert(`Removed ${data} test friends`);
           onChange?.();
@@ -77,9 +71,7 @@ export function TestTools({ onChange }: { onChange?: () => void }) {
 
   return (
     <Sticker shadow={null} color={colors.muteFill} innerStyle={{ padding: 14, gap: 10 }}>
-      <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>
-        TEST MODE · ONLY YOU SEE THIS
-      </Text>
+      <Label>Test mode · only you see this</Label>
       <View style={{ gap: 4 }}>
         <Button variant="dashed" label={busy ? 'One sec…' : 'Load test friends'} onPress={load} />
         <Button variant="dashed" label="Start a test vote (buzzer in 3 min)" onPress={testVote} />

@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 
 import { SKIP_LOGIN } from './config';
 import { registerForPush } from './push';
+import { PROFILE } from './queries';
 import { supabase } from './supabase';
 import type { Profile } from './types';
 
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url')
+      .select(PROFILE)
       .eq('id', id)
       .maybeSingle();
     setProfile(data ?? { id, display_name: null, avatar_url: null });

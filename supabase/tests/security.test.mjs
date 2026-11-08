@@ -1,35 +1,21 @@
 // Security checks: who can see and call what. Run: npm run test:security
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { setup, as, check, expectError, migrationSql, done } from './harness.mjs';
 
-const db = new PGlite();
-await db.exec(`
-  create role anon; create role authenticated;
-  grant usage on schema public to anon, authenticated;
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  create schema auth;
-  create table auth.users (
-    id uuid primary key, phone text, aud text, role text,
-    created_at timestamptz, updated_at timestamptz, is_anonymous boolean not null default false
-  );
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
-  create publication supabase_realtime;
-  create schema storage;
-  create table storage.buckets (id text primary key, name text, public boolean);
-  create table storage.objects (bucket_id text, name text);
-  create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
-  alter table storage.objects enable row level security;
-`);
-// Like hosted Supabase: new functions are callable by anon and authenticated unless revoked.
-await db.exec(`create role supabase_auth_admin;
-  alter default privileges in schema public grant execute on functions to anon, authenticated;`);
-for (const f of ['20261014200000_initial_schema', '20261014210000_dev_sms_hook', '20261014230000_mock_friends', '20261015000000_open_roams',
-  '20261016210000_release_ready', '20261016220000_safety_and_push', '20261025000000_bug_fixes', '20261103000000_security_hardening']) {
-  await db.exec(readFileSync(`supabase/migrations/${f}.sql`, 'utf8'));
-}
+const db = await setup({
+  // Like hosted Supabase: new functions are callable by anon and authenticated unless revoked.
+  extraSql: `create role supabase_auth_admin;
+  alter default privileges in schema public grant execute on functions to anon, authenticated;`,
+  migrations: [
+    '20261014200000_initial_schema',
+    '20261014210000_dev_sms_hook',
+    '20261014230000_mock_friends',
+    '20261015000000_open_roams',
+    '20261016210000_release_ready',
+    '20261016220000_safety_and_push',
+    '20261025000000_bug_fixes',
+    '20261103000000_security_hardening',
+  ],
+});
 
 const A = '3f9a12bc-0000-4000-8000-00000000000a'; // Nate
 const B = '00000000-0000-0000-0000-00000000000b'; // Jo, Nate's friend
@@ -41,16 +27,6 @@ await db.exec(`insert into auth.users (id) values ('${A}'), ('${B}'), ('${C}'), 
   update public.profiles set display_name = 'Sam' where id = '${C}';
   update public.profiles set display_name = 'Dee' where id = '${D}';`);
 
-async function as(user, sql) {
-  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${user ?? ''}', false); set role ${user ? 'authenticated' : 'anon'};`);
-  try { return await db.query(sql); } finally { await db.exec('reset role;'); }
-}
-let failures = 0;
-const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failures++; };
-async function expectError(name, user, sql, code) {
-  try { await as(user, sql); check(name, false); }
-  catch (e) { check(name, e.message.includes(code)); if (!e.message.includes(code)) console.log('   got:', e.message); }
-}
 const ids = async (user, sql) => (await as(user, sql)).rows.map((r) => r.id);
 
 await as(A, `select public.add_friend('${B}')`); await as(B, `select public.add_friend('${A}')`);
@@ -141,8 +117,7 @@ await as(A, `delete from storage.objects where name = '${B}/avatar-2.jpg'`);
 check("you can't delete someone else's photo", (await db.query(`select count(*)::int n from storage.objects where name = '${B}/avatar-2.jpg'`)).rows[0].n === 1);
 
 // Running the file twice is safe
-await db.exec(readFileSync('supabase/migrations/20261103000000_security_hardening.sql', 'utf8'));
+await db.exec(migrationSql('20261103000000_security_hardening'));
 check('the hardening file can be run again', true);
 
-console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
-process.exit(failures ? 1 : 0);
+done();

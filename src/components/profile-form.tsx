@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
-import { pickAndUploadAvatar, removeOldPhotos } from '@/lib/avatar';
+import { pickAndUploadAvatar, removePhotos } from '@/lib/avatar';
+import { GENERIC_ERROR } from '@/lib/roams';
 import { supabase } from '@/lib/supabase';
 import { border, colors, fonts } from '@/lib/theme';
 import { CameraIcon, PlusIcon } from './icons';
@@ -42,11 +43,11 @@ export function ProfileForm({ cta, onSaved }: { cta: string; onSaved?: () => voi
       .eq('id', userId);
     setSaving(false);
     if (error) {
-      Alert.alert("Couldn't save", 'Something went sideways. Try again?');
+      Alert.alert("Couldn't save", GENERIC_ERROR);
       return;
     }
     await refreshProfile();
-    removeOldPhotos(userId, avatarUrl).catch(() => {});
+    removePhotos(userId, avatarUrl).catch(() => {});
     onSaved?.();
   }
 

@@ -1,29 +1,7 @@
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { setup, as, check, expectError, done } from './harness.mjs';
 
-const db = new PGlite();
-const migration = readFileSync(process.argv[2], 'utf8');
+const db = await setup({ files: [process.argv[2]] });
 
-// Minimal stand-ins for what Supabase provides.
-await db.exec(`
-  create role anon; create role authenticated;
-  grant usage on schema public to anon, authenticated;
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  create schema auth;
-  create table auth.users (id uuid primary key, phone text);
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
-  create publication supabase_realtime;
-  create schema storage;
-  create table storage.buckets (id text primary key, name text, public boolean);
-  create table storage.objects (bucket_id text, name text);
-  create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
-  alter table storage.objects enable row level security;
-`);
-
-await db.exec(migration);
 console.log('migration applied');
 
 const A = '00000000-0000-0000-0000-00000000000a';
@@ -38,17 +16,6 @@ await db.exec(`
   update public.profiles set display_name = 'Dee' where id = '${D}';
 `);
 
-async function as(user, sql, params = []) {
-  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${user}', false); set role authenticated;`);
-  try { return await db.query(sql, params); }
-  finally { await db.exec('reset role;'); }
-}
-let failures = 0;
-function check(name, cond) { console.log((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) failures++; }
-async function expectError(name, user, sql, code) {
-  try { await as(user, sql); check(name + ' (expected ' + code + ')', false); }
-  catch (e) { check(name, e.message.includes(code)); if (!e.message.includes(code)) console.log('   got:', e.message); }
-}
 
 // Contacts + friends
 const m = await as(A, `select * from public.match_contacts(array['+44 7700 900002','07700 900003'])`);
@@ -121,5 +88,4 @@ try { await db.query(`select public.match_contacts(array['1'])`); check('anon bl
 catch (e) { check('anon blocked from functions', e.message.includes('permission denied')); }
 await db.exec('reset role;');
 
-console.log(failures ? `\n${failures} FAILED` : '\nall checks passed');
-process.exit(failures ? 1 : 0);
+done();

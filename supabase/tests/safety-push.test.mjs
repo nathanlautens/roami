@@ -1,32 +1,15 @@
 // Checks block & report and push notifications. Run: npm run test:push
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { setup, as, check, expectError, done } from './harness.mjs';
 
-const db = new PGlite();
-await db.exec(`
-  create role anon; create role authenticated;
-  grant usage on schema public to anon, authenticated;
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  create schema auth;
-  create table auth.users (
-    id uuid primary key, phone text, aud text, role text,
-    created_at timestamptz, updated_at timestamptz, is_anonymous boolean not null default false
-  );
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
-  create publication supabase_realtime;
-  create schema storage;
-  create table storage.buckets (id text primary key, name text, public boolean);
-  create table storage.objects (bucket_id text, name text);
-  create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
-  alter table storage.objects enable row level security;
-`);
-for (const f of ['20261014200000_initial_schema', '20261014230000_mock_friends', '20261015000000_open_roams',
-  '20261016210000_release_ready', '20261016220000_safety_and_push']) {
-  await db.exec(readFileSync(`supabase/migrations/${f}.sql`, 'utf8'));
-}
+const db = await setup({
+  migrations: [
+    '20261014200000_initial_schema',
+    '20261014230000_mock_friends',
+    '20261015000000_open_roams',
+    '20261016210000_release_ready',
+    '20261016220000_safety_and_push',
+  ],
+});
 
 const A = '00000000-0000-0000-0000-00000000000a'; // Nate
 const B = '00000000-0000-0000-0000-00000000000b'; // Jo
@@ -41,16 +24,6 @@ await db.exec(`insert into auth.users (id) values ('${A}'), ('${B}'), ('${C}'), 
     ('${A}', 'ExponentPushToken[a]', 'Europe/London'), ('${B}', 'ExponentPushToken[b]', 'Europe/London'),
     ('${C}', 'ExponentPushToken[c]', 'Europe/London'), ('${D}', 'ExponentPushToken[d]', 'Asia/Tokyo');`);
 
-async function as(user, sql) {
-  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${user}', false); set role authenticated;`);
-  try { return await db.query(sql); } finally { await db.exec('reset role;'); }
-}
-let failures = 0;
-const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failures++; };
-async function expectError(name, user, sql, code) {
-  try { await as(user, sql); check(name, false); }
-  catch (e) { check(name, e.message.includes(code)); if (!e.message.includes(code)) console.log('   got:', e.message); }
-}
 const pushes = async (user) => (await db.query(`select title, body, data, send_after from public.notifications where user_id = '${user}' order by id`)).rows;
 const clear = () => db.exec('delete from public.notifications');
 
@@ -163,5 +136,4 @@ check('reporters see their own reports only', (await as(A, 'select * from public
 await expectError('you can only report Roams you are on', C, `select public.report(null, '${shared}', 'spam')`, 'not_invited');
 await expectError('reasons are a fixed list', C, `select public.report('${A}', null, 'vibes')`, 'reports_reason_check');
 
-console.log(failures ? `\n${failures} FAILED` : '\nall checks passed');
-process.exit(failures ? 1 : 0);
+done();

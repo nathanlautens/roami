@@ -10,18 +10,16 @@ import { RoamCard } from '@/components/roam-card';
 import { SentCelebration } from '@/components/sent-celebration';
 import { TestTools } from '@/components/test-tools';
 import { UnlockPrompt } from '@/components/unlock-prompt';
-import { Avatar, Body, Button, Sticker } from '@/components/ui';
+import { Avatar, Body, Button, Label, Sticker } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { syncCalendar } from '@/lib/calendar';
 import { SKIP_LOGIN } from '@/lib/config';
-import { useAppLocked } from '@/lib/lock';
 import { useFeed, useFriends, type FeedItem } from '@/lib/data';
+import { DAYS, MONTHS } from '@/lib/format';
+import { useAppLocked } from '@/lib/lock';
 import { markBuzzerSeen, resolveDue, seenBuzzers, useOpenRoams, useTick } from '@/lib/open-roams';
 import { effectiveResponse, isActive } from '@/lib/roams';
 import { colors, fonts } from '@/lib/theme';
-
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function Feed() {
   const { profile, userId } = useAuth();
@@ -143,12 +141,9 @@ export default function Feed() {
             Revisit once calendar integrations exist (v2). */}
         {buzzing.length ? (
           <View style={{ gap: 12, marginTop: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.yellow, borderWidth: 2, borderColor: colors.ink }} />
-              <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>
-                BUZZING · {buzzing.length}
-              </Text>
-            </View>
+            <Label dot={colors.yellow} count={buzzing.length}>
+              Buzzing
+            </Label>
             {buzzing.map((o) => (
               <OpenRoamCard key={o.id} o={o} me={me} now={tick} />
             ))}
@@ -211,12 +206,9 @@ function Section({
   if (!items.length) return null;
   return (
     <View style={{ gap: 12, marginTop: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dot, borderWidth: 2, borderColor: colors.ink }} />
-        <Text style={{ fontFamily: fonts.bodyBold, fontSize: 13, letterSpacing: 1, color: colors.ink }}>
-          {title.toUpperCase()} · {items.length}
-        </Text>
-      </View>
+      <Label dot={dot} count={items.length}>
+        {title}
+      </Label>
       {items.map((it) => (
         <RoamCard key={it.roam.id} item={it} me={me} variant={variant} />
       ))}

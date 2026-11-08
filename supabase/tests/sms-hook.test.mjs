@@ -3,6 +3,8 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 
+import { check, done } from './harness.mjs';
+
 const db = new PGlite();
 await db.exec(`
   create role anon; create role authenticated; create role supabase_auth_admin;
@@ -10,8 +12,6 @@ await db.exec(`
 `);
 await db.exec(readFileSync(process.argv[2], 'utf8'));
 
-let failures = 0;
-const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failures++; };
 
 const event = { user: { phone: '447700900123' }, sms: { otp: '123456' } };
 
@@ -45,5 +45,4 @@ await db.query('select public.send_sms_hook($1::jsonb)', [JSON.stringify(event)]
 await db.exec('reset role');
 check('codes older than a day are deleted', (await db.query(`select * from public.dev_sms_codes where otp = '000000'`)).rows.length === 0);
 
-console.log(failures ? `\n${failures} FAILED` : '\nall checks passed');
-process.exit(failures ? 1 : 0);
+done();

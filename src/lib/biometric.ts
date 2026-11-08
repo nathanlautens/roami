@@ -1,5 +1,7 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 
+import { readString as read, writeString as write } from './storage';
+
 /**
  * Face ID / fingerprint unlock.
  *
@@ -11,22 +13,6 @@ import * as LocalAuthentication from 'expo-local-authentication';
 
 const KEY = 'roami.biometricUnlock';
 const ASKED_KEY = 'roami.biometricAsked';
-
-function read(key: string) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function write(key: string, value: string | null) {
-  try {
-    if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch {
-    // best effort
-  }
-}
 
 export function isUnlockEnabled() {
   return read(KEY) === 'on';
@@ -58,7 +44,9 @@ export async function unlockKind(): Promise<'face' | 'fingerprint' | 'passcode' 
   }
 }
 
-export function unlockLabel(kind: Awaited<ReturnType<typeof unlockKind>>) {
+export type UnlockKind = Awaited<ReturnType<typeof unlockKind>>;
+
+export function unlockLabel(kind: UnlockKind) {
   return kind === 'face' ? 'Face ID' : kind === 'fingerprint' ? 'fingerprint' : 'your passcode';
 }
 

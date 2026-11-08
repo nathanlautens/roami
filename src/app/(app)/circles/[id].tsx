@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
-import { Avatar, Body, Button, Checkbox, Field, H1, Label, Loading, Progress, Screen, TopBar } from '@/components/ui';
+import { Body, Button, Checkbox, Field, H1, Label, Loading, PersonRow, Progress, Screen, TopBar } from '@/components/ui';
 import { useCircles, useFriends } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
-import { border, colors, fonts, radius } from '@/lib/theme';
+import { toggleIn } from '@/lib/use-action';
+import { colors, fonts } from '@/lib/theme';
 import type { Circle } from '@/lib/types';
 
 /** /circles/new makes a circle; /circles/<id> edits one. */
@@ -36,14 +37,7 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
   const [picked, setPicked] = useState<Set<string>>(() => new Set(circle?.members.map((m) => m.id) ?? []));
   const [saving, setSaving] = useState(false);
 
-  function toggle(fid: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(fid)) next.delete(fid);
-      else next.add(fid);
-      return next;
-    });
-  }
+  const toggle = (fid: string) => setPicked((prev) => toggleIn(prev, fid));
 
   async function save() {
     const trimmed = name.trim();
@@ -135,25 +129,9 @@ function CircleForm({ id, circle, onboarding }: { id: string; circle?: Circle; o
           {friends.friends.map((f) => {
             const on = picked.has(f.id);
             return (
-              <Pressable
-                key={f.id}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: on }}
-                onPress={() => toggle(f.id)}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: 10,
-                  borderWidth: border,
-                  borderColor: colors.ink,
-                  borderRadius: radius.md,
-                  backgroundColor: on ? colors.white : colors.ground,
-                }}>
-                <Avatar profile={f} size={40} />
-                <Text style={{ flex: 1, fontFamily: fonts.bodyBold, fontSize: 16, color: colors.ink }}>{f.display_name}</Text>
+              <PersonRow key={f.id} profile={f} role="checkbox" checked={on} onPress={() => toggle(f.id)} color={on ? colors.white : colors.ground}>
                 <Checkbox checked={on} />
-              </Pressable>
+              </PersonRow>
             );
           })}
         </View>

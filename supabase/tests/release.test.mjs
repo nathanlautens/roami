@@ -1,31 +1,14 @@
 // Checks the release migration. Run: npm run test:release
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { setup, as, check, expectError, done } from './harness.mjs';
 
-const db = new PGlite();
-await db.exec(`
-  create role anon; create role authenticated;
-  grant usage on schema public to anon, authenticated;
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  create schema auth;
-  create table auth.users (
-    id uuid primary key, phone text, aud text, role text,
-    created_at timestamptz, updated_at timestamptz, is_anonymous boolean not null default false
-  );
-  create function auth.uid() returns uuid language sql stable as
-    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
-  create publication supabase_realtime;
-  create schema storage;
-  create table storage.buckets (id text primary key, name text, public boolean);
-  create table storage.objects (bucket_id text, name text);
-  create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
-  alter table storage.objects enable row level security;
-`);
-for (const f of ['20261014200000_initial_schema', '20261014230000_mock_friends', '20261015000000_open_roams', '20261016210000_release_ready']) {
-  await db.exec(readFileSync(`supabase/migrations/${f}.sql`, 'utf8'));
-}
+const db = await setup({
+  migrations: [
+    '20261014200000_initial_schema',
+    '20261014230000_mock_friends',
+    '20261015000000_open_roams',
+    '20261016210000_release_ready',
+  ],
+});
 
 const A = '00000000-0000-0000-0000-00000000000a';
 const B = '00000000-0000-0000-0000-00000000000b';
@@ -36,16 +19,6 @@ await db.exec(`insert into auth.users (id) values ('${A}'), ('${B}'), ('${C}');
   update public.profiles set display_name = 'Sam' where id = '${C}';
   insert into public.friendships (requester_id, addressee_id, status) values ('${B}', '${A}', 'accepted'), ('${C}', '${A}', 'accepted');`);
 
-async function as(user, sql) {
-  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${user}', false); set role authenticated;`);
-  try { return await db.query(sql); } finally { await db.exec('reset role;'); }
-}
-let failures = 0;
-const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) failures++; };
-async function expectError(name, user, sql, code) {
-  try { await as(user, sql); check(name, false); }
-  catch (e) { check(name, e.message.includes(code)); if (!e.message.includes(code)) console.log('   got:', e.message); }
-}
 
 // Test helpers are locked away
 await expectError('app users cannot create test friends', A, 'select public.seed_mock_friends()', 'permission denied');
@@ -82,5 +55,4 @@ check('their circles are gone', (await db.query(`select count(*)::int n from pub
 check('their votes are gone', (await db.query(`select count(*)::int n from public.open_roam_night_votes where user_id = '${B}'`)).rows[0].n === 0);
 check('other people are untouched', (await db.query(`select count(*)::int n from auth.users`)).rows[0].n === 3);
 
-console.log(failures ? `\n${failures} FAILED` : '\nall checks passed');
-process.exit(failures ? 1 : 0);
+done();

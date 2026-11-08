@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 
-import { authenticate, setUnlockEnabled, unlockKind, unlockLabel, wasAskedAboutUnlock } from '@/lib/biometric';
+import { authenticate, setUnlockEnabled, unlockKind, unlockLabel, wasAskedAboutUnlock, type UnlockKind } from '@/lib/biometric';
 import { colors, fonts } from '@/lib/theme';
 import { Body, Button, Sheet } from './ui';
 
 /** Asks once, after sign-up: "Use Face ID to get in from now on?" */
 export function UnlockPrompt() {
-  const [kind, setKind] = useState<Awaited<ReturnType<typeof unlockKind>>>(null);
+  const [kind, setKind] = useState<UnlockKind>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {

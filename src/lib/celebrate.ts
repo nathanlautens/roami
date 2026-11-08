@@ -1,28 +1,17 @@
-import { useSyncExternalStore } from 'react';
+import { createSignal } from './signal';
 
 /** A tiny signal: the send screen fires it, the home screen plays the celebration. */
 export type Sent = { id: number; what: string; count: number; title?: string; line?: string };
 
-let current: Sent | null = null;
+const current = createSignal<Sent | null>(null);
 let nextId = 1;
-const listeners = new Set<() => void>();
 
 export function celebrateSent(sent: Omit<Sent, 'id'>) {
-  current = { ...sent, id: nextId++ };
-  listeners.forEach((l) => l());
+  current.set({ ...sent, id: nextId++ });
 }
 
 export function clearCelebration() {
-  current = null;
-  listeners.forEach((l) => l());
+  current.set(null);
 }
 
-export function useCelebration(): Sent | null {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    () => current,
-  );
-}
+export const useCelebration = current.use;
